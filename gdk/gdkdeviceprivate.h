@@ -32,6 +32,12 @@ G_BEGIN_DECLS
 typedef struct _GdkDeviceClass GdkDeviceClass;
 typedef struct _GdkDeviceKey GdkDeviceKey;
 
+struct _GdkDeviceTool
+{
+  guint64 serial;
+  gint ref_count;
+};
+
 struct _GdkDeviceKey
 {
   guint keyval;
@@ -182,6 +188,11 @@ GdkWindow * _gdk_device_window_at_position    (GdkDevice        *device,
 
 void  gdk_device_set_seat  (GdkDevice *device,
                             GdkSeat   *seat);
+
+/* Device tools */
+GdkDeviceTool *gdk_device_tool_new    (guint64        serial);
+GdkDeviceTool *gdk_device_tool_ref    (GdkDeviceTool *tool);
+void           gdk_device_tool_unref  (GdkDeviceTool *tool);
 
 G_END_DECLS
 
