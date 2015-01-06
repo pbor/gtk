@@ -186,6 +186,7 @@ struct _GdkEventPrivate
   GdkDevice *device;
   GdkDevice *source_device;
   GdkSeat   *seat;
+  GdkDeviceTool *tool;
 };
 
 typedef struct _GdkWindowPaint GdkWindowPaint;
