@@ -2020,12 +2020,14 @@ G_DEFINE_BOXED_TYPE (GdkDeviceTool, gdk_device_tool,
                      gdk_device_tool_ref, gdk_device_tool_unref);
 
 GdkDeviceTool *
-gdk_device_tool_new (guint64 serial)
+gdk_device_tool_new (guint64           serial,
+                     GdkDeviceToolType type)
 {
   GdkDeviceTool *tool;
 
   tool = g_new0 (GdkDeviceTool, 1);
   tool->serial = serial;
+  tool->type = type;
 
   return tool;
 }
@@ -2061,4 +2063,23 @@ gdk_device_tool_get_serial (GdkDeviceTool *tool)
   g_return_val_if_fail (tool != NULL, 0);
 
   return tool->serial;
+}
+
+/**
+ * gdk_device_tool_get_tool_type:
+ * @tool: a #GdkDeviceTool
+ *
+ * Gets the #GdkDeviceToolType of the tool.
+ *
+ * Returns: The physical type for this tool. This can be used to figure out what
+ * sort of pen is being used, such as an airbrush or a pencil.
+ *
+ * Since: 3.18
+ **/
+GdkDeviceToolType
+gdk_device_tool_get_tool_type (GdkDeviceTool *tool)
+{
+  g_return_val_if_fail (tool != NULL, GDK_DEVICE_TOOL_TYPE_UNKNOWN);
+
+  return tool->type;
 }

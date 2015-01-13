@@ -140,6 +140,27 @@ typedef enum {
   GDK_DEVICE_TYPE_FLOATING
 } GdkDeviceType;
 
+/**
+ * GdkDeviceToolType:
+ * @GDK_DEVICE_TOOL_TYPE_UNKNOWN: Tool is of an unknown type.
+ * @GDK_DEVICE_TOOL_TYPE_PEN: Tool is a standard tablet stylus.
+ * @GDK_DEVICE_TOOL_TYPE_ERASER: Tool is standard tablet eraser.
+ * @GDK_DEVICE_TOOL_TYPE_BRUSH: Tool is a brush stylus.
+ * @GDK_DEVICE_TOOL_TYPE_PENCIL: Tool is a pencil stylus.
+ * @GDK_DEVICE_TOOL_TYPE_AIRBRUSH: Tool is an airbrush stylus.
+ *
+ * Indicates the specific type of tool being used being a tablet. Such as an
+ * airbrush, pencil, etc.
+ */
+typedef enum {
+  GDK_DEVICE_TOOL_TYPE_UNKNOWN,
+  GDK_DEVICE_TOOL_TYPE_PEN,
+  GDK_DEVICE_TOOL_TYPE_ERASER,
+  GDK_DEVICE_TOOL_TYPE_BRUSH,
+  GDK_DEVICE_TOOL_TYPE_PENCIL,
+  GDK_DEVICE_TOOL_TYPE_AIRBRUSH
+} GdkDeviceToolType;
+
 /* We don't allocate each coordinate this big, but we use it to
  * be ANSI compliant and avoid accessing past the defined limits.
  */
@@ -306,6 +327,9 @@ GType gdk_device_tool_get_type (void) G_GNUC_CONST;
 
 GDK_AVAILABLE_IN_3_18
 guint gdk_device_tool_get_serial (GdkDeviceTool *tool);
+
+GDK_AVAILABLE_IN_3_18
+GdkDeviceToolType gdk_device_tool_get_tool_type (GdkDeviceTool *tool);
 
 G_END_DECLS
 

@@ -35,6 +35,7 @@ typedef struct _GdkDeviceKey GdkDeviceKey;
 struct _GdkDeviceTool
 {
   guint64 serial;
+  GdkDeviceToolType type;
   gint ref_count;
 };
 
@@ -191,7 +192,8 @@ void  gdk_device_set_seat  (GdkDevice *device,
                             GdkSeat   *seat);
 
 /* Device tools */
-GdkDeviceTool *gdk_device_tool_new    (guint64        serial);
+GdkDeviceTool *gdk_device_tool_new    (guint64            serial,
+                                       GdkDeviceToolType  type);
 GdkDeviceTool *gdk_device_tool_ref    (GdkDeviceTool *tool);
 void           gdk_device_tool_unref  (GdkDeviceTool *tool);
 void           gdk_device_update_tool (GdkDevice     *device,
