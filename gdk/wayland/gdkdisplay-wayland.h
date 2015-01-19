@@ -27,6 +27,7 @@
 #include <wayland-client.h>
 #include <wayland-cursor.h>
 #include <wayland-egl.h>
+#include <gdk/wayland/wayland-tablet-client-protocol.h>
 #include <gdk/wayland/gtk-shell-client-protocol.h>
 #include <gdk/wayland/xdg-shell-unstable-v5-client-protocol.h>
 
@@ -74,6 +75,7 @@ struct _GdkWaylandDisplay
   struct wl_data_device_manager *data_device_manager;
   struct wl_subcompositor *subcompositor;
   struct zwp_pointer_gestures_v1 *pointer_gestures;
+  struct zwp_tablet_manager_v1 *tablet_manager;
 
   GList *async_roundtrips;
 
