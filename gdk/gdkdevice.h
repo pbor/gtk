@@ -89,6 +89,7 @@ typedef enum
  * @GDK_AXIS_XTILT: the axis is used for x tilt information.
  * @GDK_AXIS_YTILT: the axis is used for y tilt information.
  * @GDK_AXIS_WHEEL: the axis is used for wheel information.
+ * @GDK_AXIS_DISTANCE: the axis is used for pen/tablet distance information..
  * @GDK_AXIS_LAST: a constant equal to the numerically highest axis value.
  *
  * An enumeration describing the way in which a device
@@ -104,6 +105,7 @@ typedef enum
   GDK_AXIS_XTILT,
   GDK_AXIS_YTILT,
   GDK_AXIS_WHEEL,
+  GDK_AXIS_DISTANCE,
   GDK_AXIS_LAST
 } GdkAxisUse;
 
