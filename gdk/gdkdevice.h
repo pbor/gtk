@@ -109,6 +109,17 @@ typedef enum
   GDK_AXIS_LAST
 } GdkAxisUse;
 
+typedef enum
+{
+  GDK_AXIS_FLAG_X        = 1 << GDK_AXIS_X,
+  GDK_AXIS_FLAG_Y        = 1 << GDK_AXIS_Y,
+  GDK_AXIS_FLAG_PRESSURE = 1 << GDK_AXIS_PRESSURE,
+  GDK_AXIS_FLAG_XTILT    = 1 << GDK_AXIS_XTILT,
+  GDK_AXIS_FLAG_YTILT    = 1 << GDK_AXIS_YTILT,
+  GDK_AXIS_FLAG_WHEEL    = 1 << GDK_AXIS_WHEEL,
+  GDK_AXIS_FLAG_DISTANCE = 1 << GDK_AXIS_DISTANCE
+} GdkAxisFlags;
+
 /**
  * GdkDeviceType:
  * @GDK_DEVICE_TYPE_MASTER: Device is a master (or virtual) device. There will
@@ -283,6 +294,9 @@ const gchar *gdk_device_get_product_id      (GdkDevice *device);
 
 GDK_AVAILABLE_IN_3_20
 GdkSeat     *gdk_device_get_seat            (GdkDevice *device);
+
+GDK_AVAILABLE_IN_3_20
+GdkAxisFlags gdk_device_get_axes            (GdkDevice *device);
 
 G_END_DECLS
 
