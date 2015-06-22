@@ -2021,13 +2021,15 @@ G_DEFINE_BOXED_TYPE (GdkDeviceTool, gdk_device_tool,
 
 GdkDeviceTool *
 gdk_device_tool_new (guint64           serial,
-                     GdkDeviceToolType type)
+                     GdkDeviceToolType type,
+                     GdkAxisFlags      tool_axes)
 {
   GdkDeviceTool *tool;
 
   tool = g_new0 (GdkDeviceTool, 1);
   tool->serial = serial;
   tool->type = type;
+  tool->tool_axes = tool_axes;
 
   return tool;
 }
