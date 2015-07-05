@@ -122,6 +122,7 @@
 #include <gtk/gtkicontheme.h>
 #include <gtk/gtkiconview.h>
 #include <gtk/gtkimage.h>
+#include <gtk/gtkimageview.h>
 #include <gtk/gtkimcontext.h>
 #include <gtk/gtkimcontextinfo.h>
 #include <gtk/gtkimcontextsimple.h>
