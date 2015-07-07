@@ -35,13 +35,6 @@ struct _GtkImageViewClass
   void (* prepare_image) (cairo_surface_t *image);
 };
 
-typedef enum
-{
-  GTK_IMAGE_VIEW_ZOOM_MODE_ORIGINAL,
-  GTK_IMAGE_VIEW_ZOOM_MODE_FIT,
-  GTK_IMAGE_VIEW_ZOOM_MODE_NONE
-} GtkImageViewZoomMode;
-
 
 GDK_AVAILABLE_IN_3_18
 GType         gtk_image_view_get_type (void) G_GNUC_CONST;
@@ -90,21 +83,20 @@ double gtk_image_view_get_angle (GtkImageView *image_view);
 
 
 GDK_AVAILABLE_IN_3_18
-void gtk_image_view_set_zoom_mode (GtkImageView         *image_view,
-                                   GtkImageViewZoomMode  zoom_mode);
-
-GDK_AVAILABLE_IN_3_18
-GtkImageViewZoomMode gtk_image_view_get_zoom_mode (GtkImageView *image_view);
-
-
-
-GDK_AVAILABLE_IN_3_18
-gboolean gtk_image_view_snap_angle (GtkImageView *image_view);
+gboolean gtk_image_get_view_snap_angle (GtkImageView *image_view);
 
 GDK_AVAILABLE_IN_3_18
 void gtk_image_view_set_snap_angle (GtkImageView *image_view,
                                     gboolean      snap_rotation);
 
+
+
+GDK_AVAILABLE_IN_3_18
+gboolean gtk_image_view_get_fit_allocation (GtkImageView *image_view);
+
+GDK_AVAILABLE_IN_3_18
+void gtk_image_view_set_fit_allocation (GtkImageView *image_view,
+                                        gboolean      fit_allocation);
 
 
 // XXX Adding a gtk_image_view_set_pixbuf would work, but we are working with animations internally...

@@ -22,14 +22,13 @@
 
 #define TRANSITION_DURATION (200.0 * 1000.0)
 
-
-
 struct _GtkImageViewPrivate
 {
   double   scale;
   double   angle;
-  int      zoom_mode;
   gboolean snap_angle;
+  gboolean fit_allocation;
+  gboolean scale_set;
 
   GtkGesture *rotate_gesture;
   GtkGesture *zoom_gesture;
@@ -58,11 +57,12 @@ struct _GtkImageViewPrivate
 enum
 {
   PROP_SCALE = 1,
+  PROP_SCALE_SET,
   PROP_ANGLE,
-  PROP_ZOOM_MODE,
   PROP_ROTATE_ENABLED,
   PROP_ZOOM_ENABLED,
   PROP_SNAP_ANGLE,
+  PROP_FIT_ALLOCATION,
   LAST_WIDGET_PROPERTY,
   PROP_HADJUSTMENT,
   PROP_VADJUSTMENT,
@@ -97,7 +97,8 @@ gtk_image_view_init (GtkImageView *image_view)
   priv->scale = 1.0;
   priv->angle = 0.0;
   priv->snap_angle = FALSE;
-  priv->zoom_mode = GTK_IMAGE_VIEW_ZOOM_MODE_FIT;
+  priv->fit_allocation = FALSE;
+  priv->scale_set = FALSE;
   priv->rotate_gesture = gtk_gesture_rotate_new ((GtkWidget *)image_view);
   priv->zoom_gesture = gtk_gesture_zoom_new ((GtkWidget *)image_view);
 
@@ -223,15 +224,20 @@ static void
 gtk_image_view_compute_bounding_box (GtkImageView *image_view,
                                      int          *width,
                                      int          *height,
-                                     double       *scale)
+                                     double       *scale_out)
 {
-  // XXX Rework this to have less code duplication
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   GtkAllocation alloc;
   int image_width;
   int image_height;
   int bb_width  = 0;
   int bb_height = 0;
+  double upper_right_degrees;
+  double upper_left_degrees;
+  double r;
+  int upper_right_x, upper_right_y;
+  int upper_left_x, upper_left_y;
+  double scale;
 
 
   if (!priv->image_surface)
@@ -245,59 +251,61 @@ gtk_image_view_compute_bounding_box (GtkImageView *image_view,
   image_width  = cairo_image_surface_get_width (priv->image_surface);
   image_height = cairo_image_surface_get_height (priv->image_surface);
 
-  if (priv->zoom_mode == GTK_IMAGE_VIEW_ZOOM_MODE_FIT ||
-      priv->zoom_mode == GTK_IMAGE_VIEW_ZOOM_MODE_ORIGINAL)
+  upper_right_degrees = DEG_TO_RAD (priv->angle) + atan ((double)image_height / (double)image_width);
+  upper_left_degrees  = DEG_TO_RAD (priv->angle) + atan ((double)image_height / -(double)image_width);
+  r = sqrtf ((image_width / 2) * (image_width / 2) + (image_height / 2) * (image_height / 2));
+
+  upper_right_x = r * cos (upper_right_degrees);
+  upper_right_y = r * sin (upper_right_degrees);
+
+  upper_left_x = r * cos (upper_left_degrees);
+  upper_left_y = r * sin (upper_left_degrees);
+
+
+  //
+  bb_width  = MAX (fabs (upper_right_x), fabs (upper_left_x)) * 2;
+  bb_height = MAX (fabs (upper_right_y), fabs (upper_left_y)) * 2;
+
+
+  if (!priv->scale_set)
     {
-      int final_width  = image_width;
-      int final_height = image_height;
-
-      double upper_right_degrees = DEG_TO_RAD (priv->angle) + atan ((double)final_height / (double)final_width);
-      double upper_left_degrees  = DEG_TO_RAD (priv->angle) + atan ((double)final_height / -(double)final_width);
-      double r = sqrtf ((final_width / 2) * (final_width / 2) + (final_height / 2) * (final_height / 2));
-
-      int upper_right_x = r * cos (upper_right_degrees);
-      int upper_right_y = r * sin (upper_right_degrees);
-
-      int upper_left_x = r * cos (upper_left_degrees);
-      int upper_left_y = r * sin (upper_left_degrees);
-
-
-      //
-      bb_width  = MAX (fabs (upper_right_x), fabs (upper_left_x)) * 2;
-      bb_height = MAX (fabs (upper_right_y), fabs (upper_left_y)) * 2;
-
       double scale_x = (double)alloc.width / (double)bb_width;
       double scale_y = (double)alloc.height / (double)bb_height;
 
-      if (scale)
-        *scale = MIN (MIN (scale_x, scale_y), 1.0);
+      scale = MIN (MIN (scale_x, scale_y), 1.0);
+    }
+  else
+    scale = priv->scale;
 
-      priv->scale = *scale;
+
+  if (scale_out)
+    {
+    // XXX Care about scale_set
+      *scale_out = scale;
+    }
+
+  if (priv->fit_allocation)
+    {
+      priv->scale = scale;
       g_object_notify_by_pspec ((GObject *)image_view,
                                 widget_props[PROP_SCALE]);
 
-      if (priv->zoom_mode == GTK_IMAGE_VIEW_ZOOM_MODE_FIT)
-        {
-          *width = bb_width * *scale;
-          *height = bb_height * *scale;
-        }
-      else if (priv->zoom_mode == GTK_IMAGE_VIEW_ZOOM_MODE_ORIGINAL)
-        {
-          *width = bb_width * *scale;
-          *height = bb_height * *scale;
-        }
-
-      return;
+      *width  = bb_width * scale;
+      *height = bb_height * scale;
     }
   else
     {
+      if (priv->scale_set)
+        {
+          *width  = bb_width * scale;
+          *height = bb_height * scale;
+        }
+      else
+        {
+          *width  = bb_width;
+          *height = bb_height;
+        }
     }
-
-  *width  = image_width;
-  *height = image_height;
-
-  if (scale)
-    *scale  = 1.0;
 }
 
 static void
@@ -317,8 +325,12 @@ gtk_image_view_update_adjustments (GtkImageView *image_view)
 
 
 
-
-  if (priv->zoom_mode == GTK_IMAGE_VIEW_ZOOM_MODE_ORIGINAL)
+  if (priv->fit_allocation)
+    {
+      gtk_adjustment_set_upper (priv->vadjustment, 0);
+      gtk_adjustment_set_upper (priv->hadjustment, 0);
+    }
+  else
     {
       int width, height;
       gtk_image_view_compute_bounding_box (image_view,
@@ -327,15 +339,9 @@ gtk_image_view_update_adjustments (GtkImageView *image_view)
                                            NULL);
       gtk_adjustment_set_upper (priv->hadjustment, width);
       gtk_adjustment_set_upper (priv->vadjustment, height);
-    }
-  else if (priv->zoom_mode == GTK_IMAGE_VIEW_ZOOM_MODE_FIT)
-    {
-      gtk_adjustment_set_upper (priv->vadjustment,
-                                gtk_widget_get_allocated_width ((GtkWidget *)image_view));
 
-      gtk_adjustment_set_upper (priv->hadjustment,
-                                gtk_widget_get_allocated_height((GtkWidget *)image_view));
     }
+
 
   gtk_adjustment_set_page_size (priv->hadjustment,
                                 gtk_widget_get_allocated_width ((GtkWidget *)image_view));
@@ -406,8 +412,6 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
   else
     draw_y = (alloc.height - image_height) / 2;
 
-
-  /*cairo_rectangle (ct, draw_x, draw_y, draw_width, draw_height);*/
 
   /* Rotate around the center */
   cairo_translate (ct, draw_x + (image_width / 2.0), draw_y + (image_height / 2.0));
@@ -489,12 +493,20 @@ gtk_image_view_set_scale (GtkImageView *image_view,
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
 
-  /*g_message ("Want to set new scale: %f", scale);*/
-
   priv->scale = scale;
-  /*gtk_image_view_set_zoom_mode (image_view, GTK_IMAGE_VIEW_ZOOM_MODE_NONE);*/
   g_object_notify_by_pspec ((GObject *)image_view,
                             widget_props[PROP_SCALE]);
+  priv->scale_set = TRUE;
+  g_object_notify_by_pspec ((GObject *)image_view,
+                            widget_props[PROP_SCALE_SET]);
+
+  if (priv->fit_allocation)
+    {
+      priv->fit_allocation = FALSE;
+      g_object_notify_by_pspec ((GObject *)image_view,
+                                widget_props[PROP_SCALE_SET]);
+    }
+
   gtk_widget_queue_resize ((GtkWidget *)image_view);
 }
 
@@ -524,6 +536,7 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   g_object_notify_by_pspec ((GObject *)image_view,
                             widget_props[PROP_ANGLE]);
 
+  gtk_widget_queue_draw ((GtkWidget *)image_view);
   gtk_widget_queue_resize ((GtkWidget *)image_view);
 }
 
@@ -534,34 +547,6 @@ gtk_image_view_get_angle (GtkImageView *image_view)
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
 
   return priv->angle;
-}
-
-
-
-void
-gtk_image_view_set_zoom_mode (GtkImageView         *image_view,
-                              GtkImageViewZoomMode  zoom_mode)
-{
-  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
-  g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
-
-  if (priv->zoom_mode == zoom_mode)
-    return;
-
-  priv->zoom_mode = zoom_mode;
-  g_object_notify_by_pspec ((GObject *)image_view,
-                            widget_props[PROP_ANGLE]);
-
-  gtk_widget_queue_resize ((GtkWidget *)image_view);
-}
-
-GtkImageViewZoomMode
-gtk_image_view_get_zoom_mode (GtkImageView *image_view)
-{
-  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
-  g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
-
-  return priv->zoom_mode;
 }
 
 
@@ -596,6 +581,45 @@ gtk_image_view_get_snap_angle (GtkImageView *image_view)
 }
 
 
+
+void
+gtk_image_view_set_fit_allocation (GtkImageView *image_view,
+                                   gboolean      fit_allocation)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
+
+  fit_allocation = !!fit_allocation;
+
+  if (fit_allocation == priv->fit_allocation)
+    return;
+
+  priv->fit_allocation = fit_allocation;
+  g_object_notify_by_pspec ((GObject *)image_view,
+                            widget_props[PROP_FIT_ALLOCATION]);
+
+  priv->scale_set = FALSE;
+  g_object_notify_by_pspec ((GObject *)image_view,
+                            widget_props[PROP_SCALE_SET]);
+
+  if (!priv->fit_allocation && !priv->scale_set)
+    {
+      priv->scale = 1.0;
+      g_object_notify_by_pspec ((GObject *)image_view,
+                                widget_props[PROP_SCALE]);
+    }
+
+  gtk_widget_queue_resize ((GtkWidget *)image_view);
+}
+
+gboolean
+gtk_image_view_get_fit_allocation (GtkImageView *image_view)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
+
+  return priv->fit_allocation;
+}
 /* }}} */
 
 
@@ -617,8 +641,11 @@ gtk_image_view_realize (GtkWidget *widget)
   attributes.height = allocation.height;
   attributes.window_type = GDK_WINDOW_CHILD;
   attributes.event_mask = gtk_widget_get_events (widget) |
-                           GDK_ENTER_NOTIFY_MASK | GDK_LEAVE_NOTIFY_MASK | GDK_POINTER_MOTION_MASK |
-                           GDK_EXPOSURE_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK;
+                          GDK_POINTER_MOTION_MASK |
+                          GDK_BUTTON_PRESS_MASK |
+                          GDK_BUTTON_RELEASE_MASK |
+                          GDK_SMOOTH_SCROLL_MASK |
+                          GDK_SCROLL_MASK;
   attributes.wclass = GDK_INPUT_OUTPUT;
 
   window = gdk_window_new (gtk_widget_get_parent_window (widget),
@@ -663,14 +690,13 @@ gtk_image_view_get_preferred_height (GtkWidget *widget,
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
   int width, height;
-  double scale;
   gtk_image_view_compute_bounding_box (image_view,
                                        &width,
                                        &height,
-                                       &scale);
+                                       NULL);
 
 
-  if (priv->zoom_mode == GTK_IMAGE_VIEW_ZOOM_MODE_FIT)
+  if (priv->fit_allocation)
     {
       *minimal = 0;
       *natural = height;
@@ -690,13 +716,12 @@ gtk_image_view_get_preferred_width (GtkWidget *widget,
   GtkImageView *image_view  = (GtkImageView *)widget;
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   int width, height;
-  double scale;
   gtk_image_view_compute_bounding_box (image_view,
                                        &width,
                                        &height,
-                                       &scale);
+                                       NULL);
 
-  if (priv->zoom_mode == GTK_IMAGE_VIEW_ZOOM_MODE_FIT)
+  if (priv->fit_allocation)
     {
       *minimal = 0;
       *natural = width;
@@ -729,11 +754,11 @@ gtk_image_view_set_property (GObject      *object,
       case PROP_ANGLE:
         gtk_image_view_set_angle (image_view, g_value_get_double (value));
         break;
-      case PROP_ZOOM_MODE:
-        gtk_image_view_set_zoom_mode (image_view, g_value_get_enum (value));
-        break;
       case PROP_SNAP_ANGLE:
         gtk_image_view_set_snap_angle (image_view, g_value_get_boolean (value));
+        break;
+      case PROP_FIT_ALLOCATION:
+        gtk_image_view_set_fit_allocation (image_view, g_value_get_boolean (value));
         break;
       case PROP_HADJUSTMENT:
         gtk_image_view_set_hadjustment (image_view, g_value_get_object (value));
@@ -769,11 +794,11 @@ gtk_image_view_get_property (GObject    *object,
       case PROP_ANGLE:
         g_value_set_double (value, priv->angle);
         break;
-      case PROP_ZOOM_MODE:
-        g_value_set_enum (value, priv->zoom_mode);
-        break;
       case PROP_SNAP_ANGLE:
         g_value_set_boolean (value, priv->snap_angle);
+        break;
+      case PROP_FIT_ALLOCATION:
+        g_value_set_boolean (value, priv->fit_allocation);
         break;
       case PROP_HADJUSTMENT:
         g_value_set_object (value, priv->hadjustment);
@@ -840,6 +865,12 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
                                                   0.0,
                                                   GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
 
+  widget_props[PROP_SCALE_SET] = g_param_spec_boolean ("scale-set",
+                                                       P_("Foo"),
+                                                       P_("fooar"),
+                                                       TRUE,
+                                                       GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
+
   widget_props[PROP_ANGLE] = g_param_spec_double ("angle",
                                                   P_("angle"),
                                                   P_("angle"),
@@ -847,13 +878,6 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
                                                   G_MAXDOUBLE,
                                                   0.0,
                                                   GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
-
-  widget_props[PROP_ZOOM_MODE] = g_param_spec_enum("zoom-mode",
-                                                   P_("zoom mode"),
-                                                   P_("zoommode"),
-                                                   GTK_TYPE_IMAGE_VIEW_ZOOM_MODE,
-                                                   GTK_IMAGE_VIEW_ZOOM_MODE_NONE,
-                                                   GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
 
   widget_props[PROP_ROTATE_ENABLED] = g_param_spec_boolean ("rotate-gesture-enabled",
                                                             P_("Foo"),
@@ -871,6 +895,14 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
                                                         P_("fooar"),
                                                         FALSE,
                                                         GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
+
+
+  widget_props[PROP_FIT_ALLOCATION] = g_param_spec_boolean ("fit-allocation",
+                                                            P_("Foo"),
+                                                            P_("fooar"),
+                                                            FALSE,
+                                                            GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
+
 
 
 

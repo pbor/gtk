@@ -37,23 +37,6 @@ load_button_cb ()
 }
 
 void
-zoom_mode_changed_cb (GtkComboBox *widget,
-                      gpointer     user_data)
-{
-  const gchar *new_id = gtk_combo_box_get_active_id (widget);
-
-  if (g_strcmp0 (new_id, "fit") == 0)
-    gtk_image_view_set_zoom_mode (GTK_IMAGE_VIEW (image_view),
-                                  GTK_IMAGE_VIEW_ZOOM_MODE_FIT);
-  else if (g_strcmp0 (new_id, "original") == 0)
-    gtk_image_view_set_zoom_mode (GTK_IMAGE_VIEW (image_view),
-                                  GTK_IMAGE_VIEW_ZOOM_MODE_ORIGINAL);
-  else
-    g_error (new_id);
-
-}
-
-void
 angle_changed_cb (GtkRange *range,
                   gpointer  user_data)
 {
@@ -142,8 +125,8 @@ do_image_view (GtkWidget *do_widget)
          image_view   = GTK_WIDGET (gtk_builder_get_object (builder, "image_view"));
           uri_entry   = GTK_WIDGET (gtk_builder_get_object (builder, "uri_entry"));
   GtkWidget *box      = GTK_WIDGET (gtk_builder_get_object (builder, "box"));
-  GtkWidget *zoom_mode_combo   = GTK_WIDGET (gtk_builder_get_object (builder, "zoom_mode_combo"));
   GtkWidget *snap_angle_button = GTK_WIDGET (gtk_builder_get_object (builder, "snap_angle_check_button"));
+  GtkWidget *fit_allocation_button = GTK_WIDGET (gtk_builder_get_object (builder, "fit_allocation_check_button"));
   GtkWidget *header_bar = gtk_header_bar_new ();
   gtk_header_bar_set_show_close_button (GTK_HEADER_BAR (header_bar), TRUE);
   gtk_window_set_titlebar (GTK_WINDOW (window), header_bar);
@@ -157,13 +140,9 @@ do_image_view (GtkWidget *do_widget)
                           G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
   g_object_bind_property (image_view, "snap-angle", snap_angle_button, "active",
                           G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
+  g_object_bind_property (image_view, "fit-allocation", fit_allocation_button, "active",
+                          G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
 
-
-
-  if (gtk_image_view_get_zoom_mode (GTK_IMAGE_VIEW (image_view)) == GTK_IMAGE_VIEW_ZOOM_MODE_FIT)
-    gtk_combo_box_set_active_id (GTK_COMBO_BOX (zoom_mode_combo), "fit");
-  else if (gtk_image_view_get_zoom_mode (GTK_IMAGE_VIEW (image_view)) == GTK_IMAGE_VIEW_ZOOM_MODE_ORIGINAL)
-    gtk_combo_box_set_active_id (GTK_COMBO_BOX (zoom_mode_combo), "original");
 
   gtk_container_add (GTK_CONTAINER (window), box);
   gtk_builder_connect_signals (builder, NULL);

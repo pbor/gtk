@@ -67,15 +67,9 @@
 
 
         <child>
-          <object class="GtkComboBoxText" id="zoom_mode_combo">
+          <object class="GtkCheckButton" id="fit_allocation_check_button">
             <property name="visible">true</property>
-            <signal name="changed" handler="zoom_mode_changed_cb" />
-
-            <items>
-              <item id="fit">ZOOM_MODE_FIT</item>
-              <item id="original">ZOOM_MODE_ORIGINAL</item>
-            </items>
-
+            <property name="label" translatable="yes">Fit Allocation</property>
           </object>
           <packing>
             <property name="left_attach">0</property>
