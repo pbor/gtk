@@ -56,8 +56,12 @@ void          gtk_image_view_load_from_file_finish   (GtkImageView  *image_view,
                                                       GAsyncResult  *result,
                                                       GError       **error);
 GDK_AVAILABLE_IN_3_18
-void          gtk_image_view_load_from_stream_async  (GtkImageView  *image_view,
-                                                      GInputStream  *stream);
+void gtk_image_view_load_from_stream_async (GtkImageView        *image_view,
+                                            GInputStream        *input_stream,
+                                            GCancellable        *cancellable,
+                                            GAsyncReadyCallback  callback,
+                                            gpointer             user_data);
+
 GDK_AVAILABLE_IN_3_18
 void          gtk_image_view_load_from_stream_finish (GtkImageView  *image_view,
                                                       GAsyncResult  *result,
@@ -83,21 +87,38 @@ double gtk_image_view_get_angle (GtkImageView *image_view);
 
 
 GDK_AVAILABLE_IN_3_18
-gboolean gtk_image_get_view_snap_angle (GtkImageView *image_view);
-
-GDK_AVAILABLE_IN_3_18
 void gtk_image_view_set_snap_angle (GtkImageView *image_view,
                                     gboolean      snap_rotation);
 
-
-
 GDK_AVAILABLE_IN_3_18
-gboolean gtk_image_view_get_fit_allocation (GtkImageView *image_view);
+gboolean gtk_image_get_view_snap_angle (GtkImageView *image_view);
+
+
 
 GDK_AVAILABLE_IN_3_18
 void gtk_image_view_set_fit_allocation (GtkImageView *image_view,
                                         gboolean      fit_allocation);
 
+GDK_AVAILABLE_IN_3_18
+gboolean gtk_image_view_get_fit_allocation (GtkImageView *image_view);
+
+
+
+GDK_AVAILABLE_IN_3_18
+void gtk_image_view_set_rotate_gesture_enabled (GtkImageView *image_view,
+                                                gboolean      rotate_gesture_enabled);
+
+GDK_AVAILABLE_IN_3_18
+gboolean gtk_image_view_get_rotate_gesture_enabled (GtkImageView *image_view);
+
+
+
+GDK_AVAILABLE_IN_3_18
+void gtk_image_view_set_zoom_gesture_enabled (GtkImageView *image_view,
+                                              gboolean      zoom_gesture_enabled);
+
+GDK_AVAILABLE_IN_3_18
+gboolean gtk_image_view_get_zoom_gesture_enabled (GtkImageView *image_view);
 
 // XXX Adding a gtk_image_view_set_pixbuf would work, but we are working with animations internally...
 

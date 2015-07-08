@@ -29,6 +29,8 @@ struct _GtkImageViewPrivate
   gboolean snap_angle;
   gboolean fit_allocation;
   gboolean scale_set;
+  gboolean rotate_gesture_enabled;
+  gboolean zoom_gesture_enabled;
 
   GtkGesture *rotate_gesture;
   GtkGesture *zoom_gesture;
@@ -59,8 +61,8 @@ enum
   PROP_SCALE = 1,
   PROP_SCALE_SET,
   PROP_ANGLE,
-  PROP_ROTATE_ENABLED,
-  PROP_ZOOM_ENABLED,
+  PROP_ROTATE_GESTURE_ENABLED,
+  PROP_ZOOM_GESTURE_ENABLED,
   PROP_SNAP_ANGLE,
   PROP_FIT_ALLOCATION,
   LAST_WIDGET_PROPERTY,
@@ -99,6 +101,8 @@ gtk_image_view_init (GtkImageView *image_view)
   priv->snap_angle = FALSE;
   priv->fit_allocation = FALSE;
   priv->scale_set = FALSE;
+  priv->rotate_gesture_enabled = TRUE;
+  priv->zoom_gesture_enabled = TRUE;
   priv->rotate_gesture = gtk_gesture_rotate_new ((GtkWidget *)image_view);
   priv->zoom_gesture = gtk_gesture_zoom_new ((GtkWidget *)image_view);
 
@@ -286,6 +290,8 @@ gtk_image_view_compute_bounding_box (GtkImageView *image_view,
 
   if (priv->fit_allocation)
     {
+
+      // XXX We probably don't want to do that here since it will be called fairly often.
       priv->scale = scale;
       g_object_notify_by_pspec ((GObject *)image_view,
                                 widget_props[PROP_SCALE]);
@@ -399,6 +405,7 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
 
   cairo_rectangle (ct, draw_x, draw_y, draw_width, draw_height);
   /* Handle the h/vadjustments, but keep the image centered in all cases */
+  // XXX There's a bug here when vadjustment != NULL && (widget_height < image_height)
   if (priv->hadjustment &&
       gtk_adjustment_get_page_size (priv->hadjustment) < draw_width)
     draw_x = -gtk_adjustment_get_value (priv->hadjustment);
@@ -486,6 +493,18 @@ gtk_image_view_set_vadjustment (GtkImageView  *image_view,
 
 
 
+/**
+ * gtk_image_view_set_scale:
+ * @image_view: A #GtkImageView
+ * @scale: The new scale value
+ *
+ * Sets the value of the #scale property. This will cause the
+ * #scale-set property to be set to #TRUE as well.
+ *
+ * If #fit-allocation is #TRUE, it will be set to #FALSE, and @image_view
+ * will be resized to the image's current size, taking the new scale into
+ * account.
+ */
 void
 gtk_image_view_set_scale (GtkImageView *image_view,
                           double        scale)
@@ -504,7 +523,7 @@ gtk_image_view_set_scale (GtkImageView *image_view,
     {
       priv->fit_allocation = FALSE;
       g_object_notify_by_pspec ((GObject *)image_view,
-                                widget_props[PROP_SCALE_SET]);
+                                widget_props[PROP_FIT_ALLOCATION]);
     }
 
   gtk_widget_queue_resize ((GtkWidget *)image_view);
@@ -536,7 +555,6 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   g_object_notify_by_pspec ((GObject *)image_view,
                             widget_props[PROP_ANGLE]);
 
-  gtk_widget_queue_draw ((GtkWidget *)image_view);
   gtk_widget_queue_resize ((GtkWidget *)image_view);
 }
 
@@ -551,6 +569,16 @@ gtk_image_view_get_angle (GtkImageView *image_view)
 
 
 
+/**
+ * gtk_image_view_set_snap_angle:
+ * @image_view: A #GtkImageView
+ * @snap_angle: The new value of the #snap-angle property
+ *
+ * Setting #snap-angle to #TRUE will cause @image_view's  angle to
+ * be snapped to 90° steps. Setting the #angle property will cause it to
+ * be set to the lower 90° step, e.g. setting #angle to 359 will cause
+ * the new value to be 270.
+ */
 void
 gtk_image_view_set_snap_angle (GtkImageView *image_view,
                                gboolean     snap_angle)
@@ -582,6 +610,21 @@ gtk_image_view_get_snap_angle (GtkImageView *image_view)
 
 
 
+/**
+ * gtk_image_view_set_fit_allocation:
+ * @image_view: A #GtkImageView
+ * @fit_allocation: The new value of the #fit-allocation property.
+ *
+ * Setting #fit-allocation to #TRUE will cause the image to be scaled
+ * to the widget's allocation, unless it would cause the image to be
+ * scaled up.
+ *
+ * Setting #fit-allocation will have the side effect of setting
+ * #scale-set set to #FALSE, thus giving the #GtkImageView the control
+ * over the image's scale. Additionally, if the new #fit-allocation
+ * value is #FALSE, the scale will be reset to 1.0 and the #GtkImageView
+ * will be resized to take at least the image's real size.
+ */
 void
 gtk_image_view_set_fit_allocation (GtkImageView *image_view,
                                    gboolean      fit_allocation)
@@ -619,6 +662,56 @@ gtk_image_view_get_fit_allocation (GtkImageView *image_view)
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
 
   return priv->fit_allocation;
+}
+
+
+
+void
+gtk_image_view_set_rotate_gesture_enabled (GtkImageView *image_view,
+                                           gboolean      rotate_gesture_enabled)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
+
+  rotate_gesture_enabled = !!rotate_gesture_enabled;
+
+  priv->rotate_gesture_enabled = rotate_gesture_enabled;
+  g_object_notify_by_pspec ((GObject *)image_view,
+                            widget_props[PROP_ROTATE_GESTURE_ENABLED]);
+}
+
+gboolean
+gtk_image_view_get_rotate_gesture_enabled (GtkImageView *image_view)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
+
+  return priv->rotate_gesture_enabled;
+}
+
+
+
+void
+gtk_image_view_set_zoom_gesture_enabled (GtkImageView *image_view,
+                                         gboolean      zoom_gesture_enabled)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
+
+  zoom_gesture_enabled = !!zoom_gesture_enabled;
+
+  priv->zoom_gesture_enabled = zoom_gesture_enabled;
+  g_object_notify_by_pspec ((GObject *)image_view,
+                            widget_props[PROP_ZOOM_GESTURE_ENABLED]);
+}
+
+gboolean
+gtk_image_view_get_zoom_gesture_enabled (GtkImageView *image_view)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
+
+  return priv->zoom_gesture_enabled;
 }
 /* }}} */
 
@@ -879,16 +972,16 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
                                                   0.0,
                                                   GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
 
-  widget_props[PROP_ROTATE_ENABLED] = g_param_spec_boolean ("rotate-gesture-enabled",
-                                                            P_("Foo"),
-                                                            P_("fooar"),
-                                                            TRUE,
-                                                            GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
-  widget_props[PROP_ZOOM_ENABLED] = g_param_spec_boolean ("zoom-gesture-enabled",
-                                                            P_("Foo"),
-                                                            P_("fooar"),
-                                                            TRUE,
-                                                            GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
+  widget_props[PROP_ROTATE_GESTURE_ENABLED] = g_param_spec_boolean ("rotate-gesture-enabled",
+                                                                    P_("Foo"),
+                                                                    P_("fooar"),
+                                                                    TRUE,
+                                                                    GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
+  widget_props[PROP_ZOOM_GESTURE_ENABLED] = g_param_spec_boolean ("zoom-gesture-enabled",
+                                                                  P_("Foo"),
+                                                                  P_("fooar"),
+                                                                  TRUE,
+                                                                  GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
 
   widget_props[PROP_SNAP_ANGLE] = g_param_spec_boolean ("snap-angle",
                                                         P_("Foo"),
@@ -997,14 +1090,13 @@ gtk_image_view_load_image_from_stream (GtkImageView *image_view,
       if (priv->source_animation)
         {
           g_assert (priv->image_surface);
-          /*cairo_surface_destroy (priv->image_surface);*/
+          cairo_surface_destroy (priv->image_surface);
           // Cleanup old pixbufanimation, iter, surface, ...
           if (priv->is_animation)
             gtk_image_view_stop_animation (image_view);
 
         }
       /*g_task_return_pointer (task, result, g_object_unref);*/
-      g_message ("Updating surface...");
       priv->source_animation = result;
       priv->is_animation = !gdk_pixbuf_animation_is_static_image (result);
       if (priv->is_animation)
@@ -1048,6 +1140,26 @@ gtk_image_view_load_image_contents (GTask        *task,
     g_task_return_error (task, error);
 }
 
+static void
+gtk_image_view_load_from_input_stream (GTask *task,
+                                       gpointer source_object,
+                                       gpointer task_data,
+                                       GCancellable *cancellable)
+{
+  GtkImageView *image_view = source_object;
+  GInputStream *in_stream = task_data;
+  GError *error = NULL;
+
+  gtk_image_view_load_image_from_stream (image_view,
+                                         in_stream,
+                                         cancellable,
+                                         error);
+
+  if (error)
+    g_task_return_error (task, error);
+}
+
+
 
 void
 gtk_image_view_load_from_file_async (GtkImageView        *image_view,
@@ -1078,15 +1190,26 @@ gtk_image_view_load_from_file_finish   (GtkImageView  *image_view,
 
 
 void
-gtk_image_view_load_from_stream_async (GtkImageView *image_view,
-                                       GInputStream *input_stream)
+gtk_image_view_load_from_stream_async (GtkImageView        *image_view,
+                                       GInputStream        *input_stream,
+                                       GCancellable        *cancellable,
+                                       GAsyncReadyCallback  callback,
+                                       gpointer             user_data)
 {
+  GTask *task;
+  g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
+  g_return_if_fail (G_IS_INPUT_STREAM (input_stream));
 
+  task = g_task_new (image_view, cancellable, callback, user_data);
+  g_task_set_task_data (task, input_stream, (GDestroyNotify)g_object_unref);
+  g_task_run_in_thread (task, gtk_image_view_load_from_input_stream);
+
+  g_object_unref (task);
 }
 void
 gtk_image_view_load_from_stream_finish (GtkImageView  *image_view,
                                         GAsyncResult  *result,
                                         GError       **error)
 {
-
+  g_return_if_fail (g_task_is_valid (result, image_view));
 }
