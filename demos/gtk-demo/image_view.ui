@@ -64,6 +64,19 @@
         </child>
 
 
+        <child>
+          <object class="GtkButton">
+            <property name="visible">true</property>
+            <property name="label" translatable="yes">Load Pixbuf</property>
+            <signal name="clicked" handler="load_pixbuf_button_clicked_cb" />
+          </object>
+          <packing>
+            <property name="left_attach">0</property>
+            <property name="top_attach">2</property>
+            <property name="width">2</property>
+          </packing>
+        </child>
+
 
 
         <child>
@@ -73,7 +86,7 @@
           </object>
           <packing>
             <property name="left_attach">0</property>
-            <property name="top_attach">2</property>
+            <property name="top_attach">3</property>
             <property name="width">2</property>
           </packing>
         </child>
@@ -87,7 +100,7 @@
           </object>
           <packing>
             <property name="left_attach">0</property>
-            <property name="top_attach">3</property>
+            <property name="top_attach">4</property>
             <property name="width">2</property>
           </packing>
         </child>
@@ -103,7 +116,7 @@
           </object>
           <packing>
             <property name="left_attach">0</property>
-            <property name="top_attach">4</property>
+            <property name="top_attach">5</property>
             <property name="width">2</property>
           </packing>
         </child>
@@ -116,7 +129,7 @@
           </object>
           <packing>
             <property name="left_attach">0</property>
-            <property name="top_attach">5</property>
+            <property name="top_attach">6</property>
             <property name="width">2</property>
           </packing>
         </child>
@@ -131,7 +144,7 @@
           </object>
           <packing>
             <property name="left_attach">0</property>
-            <property name="top_attach">6</property>
+            <property name="top_attach">7</property>
             <property name="width">2</property>
           </packing>
         </child>
@@ -174,7 +187,7 @@
           </object>
           <packing>
             <property name="left_attach">0</property>
-            <property name="top_attach">7</property>
+            <property name="top_attach">8</property>
             <property name="width">2</property>
           </packing>
         </child>
@@ -189,7 +202,7 @@
           </object>
           <packing>
             <property name="left_attach">0</property>
-            <property name="top_attach">8</property>
+            <property name="top_attach">9</property>
             <property name="width">2</property>
           </packing>
         </child>
@@ -203,7 +216,7 @@
           </object>
           <packing>
             <property name="left_attach">0</property>
-            <property name="top_attach">9</property>
+            <property name="top_attach">10</property>
             <property name="width">2</property>
           </packing>
         </child>
@@ -212,9 +225,6 @@
       </object>
 
     </child>
-
-
-
 
     <child>
       <object class="GtkImageView" id="image_view">

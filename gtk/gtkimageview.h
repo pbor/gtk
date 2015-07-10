@@ -43,6 +43,11 @@ GDK_AVAILABLE_IN_3_18
 GtkWidget *   gtk_image_view_new      ();
 
 
+GDK_AVAILABLE_IN_3_18
+void gtk_image_view_set_pixbuf (GtkImageView    *image_view,
+                                const GdkPixbuf *pixbuf);
+
+
 /* Loading {{{ */
 
 GDK_AVAILABLE_IN_3_18
@@ -71,7 +76,8 @@ void          gtk_image_view_load_from_stream_finish (GtkImageView  *image_view,
 
 /* Setters/Getters {{{ */
 GDK_AVAILABLE_IN_3_18
-void   gtk_image_view_set_scale (GtkImageView *image_view, double scale);
+void   gtk_image_view_set_scale (GtkImageView *image_view,
+                                 double        scale);
 
 GDK_AVAILABLE_IN_3_18
 double gtk_image_view_get_scale (GtkImageView *image_view);
@@ -79,7 +85,8 @@ double gtk_image_view_get_scale (GtkImageView *image_view);
 
 
 GDK_AVAILABLE_IN_3_18
-void  gtk_image_view_set_angle (GtkImageView *image_view, double angle);
+void  gtk_image_view_set_angle (GtkImageView *image_view,
+                                double        angle);
 
 GDK_AVAILABLE_IN_3_18
 double gtk_image_view_get_angle (GtkImageView *image_view);
