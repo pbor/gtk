@@ -20,7 +20,7 @@
 #define DEG_TO_RAD(x) (((x) / 360.0) * (2 * M_PI))
 #define RAD_TO_DEG(x) ((x / (2.0 * M_PI) * 360.0))
 
-#define TRANSITION_DURATION (200.0 * 1000.0)
+#define TRANSITION_DURATION (150.0 * 1000.0)
 
 struct _GtkImageViewPrivate
 {
@@ -56,11 +56,11 @@ struct _GtkImageViewPrivate
 };
 
 // XXX animate image size changes!
-// XXX Double-press gesture to zoom in/out
 //
 // XXX Keep track of the inital width/height and use a non-image cairo surface
 // XXX Pass a scaling factor to the loading functions
 //     Means: "The supplied image was designed for this scaling factor"
+// XXX Look for memory leaks
 
 enum
 {
@@ -307,12 +307,8 @@ gtk_image_view_compute_bounding_box (GtkImageView *image_view,
   else
     scale = priv->scale;
 
-
   if (scale_out)
-    {
-    // XXX Care about scale_set
-      *scale_out = scale;
-    }
+    *scale_out = scale;
 
   if (priv->fit_allocation)
     {
@@ -327,16 +323,8 @@ gtk_image_view_compute_bounding_box (GtkImageView *image_view,
     }
   else
     {
-      if (priv->scale_set)
-        {
-          *width  = bb_width * scale;
-          *height = bb_height * scale;
-        }
-      else
-        {
-          *width  = bb_width;
-          *height = bb_height;
-        }
+      *width  = bb_width * scale;
+      *height = bb_height * scale;
     }
 }
 
@@ -348,7 +336,7 @@ gtk_image_view_update_adjustments (GtkImageView *image_view)
   if (!priv->hadjustment && !priv->vadjustment)
     return;
 
-  if (!priv->source_animation)
+  if (!priv->image_surface)
     {
       gtk_adjustment_configure (priv->vadjustment, 0, 0, 0, 0, 0, 0);
       gtk_adjustment_configure (priv->hadjustment, 0, 0, 0, 0, 0, 0);
@@ -418,24 +406,10 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
   draw_x = (alloc.width  - draw_width) / 2;
   draw_y = (alloc.height - draw_height) / 2;
 
-  /* Bounding box, for debugging */
-#if 0
-  {
-    cairo_save (ct);
-    cairo_set_source_rgba (ct, 0.7, 0.7, 0.7, 1);
-    cairo_rectangle (ct, (alloc.width - draw_width) / 2, (alloc.height - draw_height) / 2, draw_width, draw_height);
-    cairo_fill (ct);
-    cairo_restore (ct);
-  }
-#endif
-
-
   cairo_save (ct);
-
-
   cairo_rectangle (ct, draw_x, draw_y, draw_width, draw_height);
+
   /* Handle the h/vadjustments, but keep the image centered in all cases */
-  // XXX There's a bug here when vadjustment != NULL && (widget_height < image_height)
   if (priv->hadjustment &&
       gtk_adjustment_get_page_size (priv->hadjustment) < draw_width)
     draw_x = -gtk_adjustment_get_value (priv->hadjustment);
@@ -444,10 +418,11 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
 
 
   if (priv->vadjustment &&
-      gtk_adjustment_get_page_size (priv->vadjustment) < draw_height)
+      gtk_widget_get_allocated_height (widget) < draw_height)
     draw_y = -gtk_adjustment_get_value (priv->vadjustment);
   else
     draw_y = (alloc.height - image_height) / 2;
+
 
 
   /* Rotate around the center */
@@ -457,7 +432,7 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
 
 
   cairo_scale (ct, scale, scale);
-  cairo_set_source_surface (ct, priv->image_surface, draw_x/scale, draw_y/scale);
+  cairo_set_source_surface (ct, priv->image_surface, draw_x / scale, draw_y / scale);
   cairo_pattern_set_filter (cairo_get_source (ct), CAIRO_FILTER_FAST);
   cairo_fill (ct);
   cairo_restore (ct);
@@ -557,6 +532,8 @@ gtk_image_view_set_scale (GtkImageView *image_view,
                                 widget_props[PROP_FIT_ALLOCATION]);
     }
 
+  gtk_image_view_update_adjustments (image_view);
+
   gtk_widget_queue_resize ((GtkWidget *)image_view);
 }
 
@@ -585,6 +562,9 @@ gtk_image_view_set_angle (GtkImageView *image_view,
 
   g_object_notify_by_pspec ((GObject *)image_view,
                             widget_props[PROP_ANGLE]);
+
+
+  gtk_image_view_update_adjustments (image_view);
 
   if (priv->fit_allocation)
     gtk_widget_queue_draw ((GtkWidget *)image_view);
@@ -685,6 +665,8 @@ gtk_image_view_set_fit_allocation (GtkImageView *image_view,
       g_object_notify_by_pspec ((GObject *)image_view,
                                 widget_props[PROP_SCALE]);
     }
+
+  gtk_image_view_update_adjustments (image_view);
 
   gtk_widget_queue_resize ((GtkWidget *)image_view);
 }
@@ -1125,16 +1107,22 @@ gtk_image_view_load_image_from_stream (GtkImageView *image_view,
         }
       /*g_task_return_pointer (task, result, g_object_unref);*/
 
-      priv->source_animation = result;
       priv->is_animation = !gdk_pixbuf_animation_is_static_image (result);
       if (priv->is_animation)
         {
+          priv->source_animation = result;
           priv->source_animation_iter = gdk_pixbuf_animation_get_iter (priv->source_animation,
                                                                        NULL);
+          gtk_image_view_update_surface (image_view,
+                                         gtk_image_view_get_current_frame (image_view));
+
           gtk_image_view_start_animation (image_view);
         }
-      gtk_image_view_update_surface (image_view,
-                                     gtk_image_view_get_current_frame (image_view));
+      else
+        {
+          gtk_image_view_update_surface (image_view,
+                                         gdk_pixbuf_animation_get_static_image (result));
+        }
     }
 }
 
