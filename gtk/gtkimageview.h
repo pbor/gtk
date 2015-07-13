@@ -45,7 +45,8 @@ GtkWidget *   gtk_image_view_new      ();
 
 GDK_AVAILABLE_IN_3_18
 void gtk_image_view_set_pixbuf (GtkImageView    *image_view,
-                                const GdkPixbuf *pixbuf);
+                                const GdkPixbuf *pixbuf,
+                                int              scale_factor);
 
 
 /* Loading {{{ */
@@ -53,6 +54,7 @@ void gtk_image_view_set_pixbuf (GtkImageView    *image_view,
 GDK_AVAILABLE_IN_3_18
 void          gtk_image_view_load_from_file_async    (GtkImageView        *image_view,
                                                       GFile               *file,
+                                                      int                  scale_factor,
                                                       GCancellable        *cancellable,
                                                       GAsyncReadyCallback  callback,
                                                       gpointer             user_data);
@@ -63,6 +65,7 @@ void          gtk_image_view_load_from_file_finish   (GtkImageView  *image_view,
 GDK_AVAILABLE_IN_3_18
 void gtk_image_view_load_from_stream_async (GtkImageView        *image_view,
                                             GInputStream        *input_stream,
+                                            int                  scale_factor,
                                             GCancellable        *cancellable,
                                             GAsyncReadyCallback  callback,
                                             gpointer             user_data);
@@ -95,7 +98,7 @@ double gtk_image_view_get_angle (GtkImageView *image_view);
 
 GDK_AVAILABLE_IN_3_18
 void gtk_image_view_set_snap_angle (GtkImageView *image_view,
-                                    gboolean      snap_rotation);
+                                    gboolean      snap_angle);
 
 GDK_AVAILABLE_IN_3_18
 gboolean gtk_image_get_view_snap_angle (GtkImageView *image_view);

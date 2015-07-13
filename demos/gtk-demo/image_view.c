@@ -19,6 +19,7 @@ file_set_cb (GtkFileChooserButton *widget,
   GFile *file = g_file_new_for_path (filename);
   gtk_image_view_load_from_file_async (GTK_IMAGE_VIEW (image_view),
                                        file,
+                                       1,
                                        NULL,
                                        generic_cb,
                                        NULL);
@@ -31,6 +32,7 @@ load_button_cb ()
   GFile *file = g_file_new_for_uri (uri);
   gtk_image_view_load_from_file_async (GTK_IMAGE_VIEW (image_view),
                                        file,
+                                       1,
                                        NULL,
                                        generic_cb,
                                        NULL);
@@ -125,7 +127,7 @@ load_pixbuf_button_clicked_cb ()
                                      NULL);
 
   g_assert (pixbuf != NULL);
-  gtk_image_view_set_pixbuf (GTK_IMAGE_VIEW (image_view), pixbuf);
+  gtk_image_view_set_pixbuf (GTK_IMAGE_VIEW (image_view), pixbuf, 1);
 }
 
 

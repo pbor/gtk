@@ -107,6 +107,20 @@
 
 
 
+
+        <child>
+          <object class="GtkCheckButton">
+            <property name="visible">true</property>
+            <property name="label" translatable="yes">Draw on Surface</property>
+          </object>
+          <packing>
+            <property name="left_attach">0</property>
+            <property name="top_attach">5</property>
+            <property name="width">2</property>
+          </packing>
+        </child>
+
+
         <child>
           <object class="GtkLabel">
             <property name="visible">true</property>
@@ -116,7 +130,7 @@
           </object>
           <packing>
             <property name="left_attach">0</property>
-            <property name="top_attach">5</property>
+            <property name="top_attach">6</property>
             <property name="width">2</property>
           </packing>
         </child>
@@ -129,11 +143,10 @@
           </object>
           <packing>
             <property name="left_attach">0</property>
-            <property name="top_attach">6</property>
+            <property name="top_attach">7</property>
             <property name="width">2</property>
           </packing>
         </child>
-
 
         <child>
           <object class="GtkScale" id="angle_scale">
@@ -144,7 +157,7 @@
           </object>
           <packing>
             <property name="left_attach">0</property>
-            <property name="top_attach">7</property>
+            <property name="top_attach">8</property>
             <property name="width">2</property>
           </packing>
         </child>
@@ -187,7 +200,7 @@
           </object>
           <packing>
             <property name="left_attach">0</property>
-            <property name="top_attach">8</property>
+            <property name="top_attach">9</property>
             <property name="width">2</property>
           </packing>
         </child>
@@ -202,7 +215,7 @@
           </object>
           <packing>
             <property name="left_attach">0</property>
-            <property name="top_attach">9</property>
+            <property name="top_attach">10</property>
             <property name="width">2</property>
           </packing>
         </child>
@@ -216,7 +229,7 @@
           </object>
           <packing>
             <property name="left_attach">0</property>
-            <property name="top_attach">10</property>
+            <property name="top_attach">11</property>
             <property name="width">2</property>
           </packing>
         </child>

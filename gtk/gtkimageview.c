@@ -29,6 +29,7 @@ struct _GtkImageViewPrivate
   gboolean snap_angle;
   gboolean fit_allocation;
   gboolean scale_set;
+  int      scale_factor;
   gboolean rotate_gesture_enabled;
   gboolean zoom_gesture_enabled;
 
@@ -95,6 +96,22 @@ G_DEFINE_TYPE_WITH_CODE (GtkImageView, gtk_image_view, GTK_TYPE_WIDGET,
                          G_ADD_PRIVATE (GtkImageView)
                          G_IMPLEMENT_INTERFACE (GTK_TYPE_SCROLLABLE, NULL))
 
+typedef struct _LoadTaskData LoadTaskData;
+
+
+// @ask How to solve this more elegantly?
+struct _LoadTaskData
+{
+  int scale_factor;
+  gpointer source;
+};
+
+static void
+free_load_task_data (LoadTaskData *data)
+{
+  g_clear_object ((&data->source));
+}
+
 
 static void
 gtk_image_view_init (GtkImageView *image_view)
@@ -119,7 +136,8 @@ gtk_image_view_init (GtkImageView *image_view)
 
 /* Prototypes {{{ */
 static void gtk_image_view_update_surface (GtkImageView    *image_view,
-                                           const GdkPixbuf *frame);
+                                           const GdkPixbuf *frame,
+                                           int              scale_factor);
 
 static void adjustment_value_changed_cb (GtkAdjustment *adjustment,
                                          gpointer       user_data);
@@ -150,7 +168,8 @@ gtk_image_view_update_animation (gpointer user_data)
 
   gdk_pixbuf_animation_iter_advance (priv->source_animation_iter, NULL);
   gtk_image_view_update_surface (image_view,
-                                 gtk_image_view_get_current_frame (image_view));
+                                 gtk_image_view_get_current_frame (image_view),
+                                 priv->scale_factor);
 
   return priv->is_animation;
 }
@@ -278,8 +297,8 @@ gtk_image_view_compute_bounding_box (GtkImageView *image_view,
     }
 
   gtk_widget_get_allocation ((GtkWidget *)image_view, &alloc);
-  image_width  = cairo_image_surface_get_width (priv->image_surface);
-  image_height = cairo_image_surface_get_height (priv->image_surface);
+  image_width  = priv->surface_width;
+  image_height = priv->surface_height;
 
   upper_right_degrees = DEG_TO_RAD (priv->angle) + atan ((double)image_height / (double)image_width);
   upper_left_degrees  = DEG_TO_RAD (priv->angle) + atan ((double)image_height / -(double)image_width);
@@ -305,7 +324,9 @@ gtk_image_view_compute_bounding_box (GtkImageView *image_view,
       scale = MIN (MIN (scale_x, scale_y), 1.0);
     }
   else
-    scale = priv->scale;
+    {
+      scale = priv->scale;
+    }
 
   if (scale_out)
     *scale_out = scale;
@@ -406,22 +427,54 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
   draw_x = (alloc.width  - draw_width) / 2;
   draw_y = (alloc.height - draw_height) / 2;
 
+
+#if 1
+  {
+    cairo_save (ct);
+    cairo_set_source_rgba (ct, 0.7, 0.7, 0.7, 1);
+    cairo_rectangle (ct, (alloc.width - draw_width) / 2, (alloc.height - draw_height) / 2, draw_width, draw_height);
+    cairo_fill (ct);
+    cairo_set_source_rgba (ct, 0, 0, 0, 1);
+    cairo_rectangle (ct, (alloc.width - draw_width) / 2, (alloc.height - draw_height) / 2, draw_width, draw_height);
+    cairo_stroke (ct);
+    cairo_restore (ct);
+  }
+
+  {
+    /*cairo_save (ct);*/
+    /*cairo_set_source_rgba (ct, 1, 0, 0, 1);*/
+    /*cairo_rectangle (ct, ((alloc.width - image_width) / 2)   / scale,*/
+                         /*((alloc.height - image_height) / 2) / scale,*/
+                         /*cairo_image_surface_get_width (priv->image_surface),*/
+                         /*cairo_image_surface_get_height (priv->image_surface));*/
+    /*cairo_stroke (ct);*/
+    /*cairo_restore (ct);*/
+  }
+#endif
+
+
+
+
   cairo_save (ct);
   cairo_rectangle (ct, draw_x, draw_y, draw_width, draw_height);
 
   /* Handle the h/vadjustments, but keep the image centered in all cases */
-  if (priv->hadjustment &&
-      gtk_adjustment_get_page_size (priv->hadjustment) < draw_width)
-    draw_x = -gtk_adjustment_get_value (priv->hadjustment);
-  else
+
+  /*if (priv->hadjustment &&*/
+      /*gtk_adjustment_get_page_size (priv->hadjustment) < draw_width)*/
+    /*draw_x = -gtk_adjustment_get_value (priv->hadjustment);*/
+  /*else*/
     draw_x = (alloc.width - image_width) / 2;
 
 
-  if (priv->vadjustment &&
-      gtk_widget_get_allocated_height (widget) < draw_height)
-    draw_y = -gtk_adjustment_get_value (priv->vadjustment);
-  else
+  /*if (priv->vadjustment &&*/
+      /*gtk_widget_get_allocated_height (widget) < draw_height)*/
+    /*draw_y = -gtk_adjustment_get_value (priv->vadjustment);*/
+  /*else*/
     draw_y = (alloc.height - image_height) / 2;
+
+    if (priv->vadjustment)
+      draw_y -= gtk_adjustment_get_value (priv->vadjustment);
 
 
 
@@ -1039,26 +1092,36 @@ gtk_image_view_new ()
 
 static void
 gtk_image_view_update_surface (GtkImageView    *image_view,
-                               const GdkPixbuf *frame)
+                               const GdkPixbuf *frame,
+                               int              scale_factor)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
-  int new_width  = gdk_pixbuf_get_width (frame);
-  int new_height = gdk_pixbuf_get_height (frame);
-  gboolean resize = TRUE;
+  int new_width    = gdk_pixbuf_get_width (frame);
+  int new_height   = gdk_pixbuf_get_height (frame);
+  int widget_scale = gtk_widget_get_scale_factor ((GtkWidget *)image_view);
+  gboolean resize  = TRUE;
+  int real_width   = (new_width * scale_factor)  / widget_scale;
+  int real_height  = (new_height * scale_factor) / widget_scale;
 
   if (!priv->image_surface ||
-      priv->surface_width  != new_width ||
-      priv->surface_height != new_height)
+      priv->surface_width  != real_width ||
+      priv->surface_height != real_height)
     {
+      GdkWindow *window = gtk_widget_get_window ((GtkWidget *)image_view);
+      int surface_scale = gtk_widget_get_scale_factor ((GtkWidget *)image_view);
+
       if (priv->image_surface)
         cairo_surface_destroy (priv->image_surface);
 
+      priv->scale_factor  = scale_factor;
       priv->image_surface = gdk_cairo_surface_create_from_pixbuf (frame,
-                                                                  1,
-                                                                  gtk_widget_get_window ((GtkWidget *)image_view));
+                                                                  surface_scale,
+                                                                  window);
+
+
       cairo_surface_reference (priv->image_surface);
-      priv->surface_width = new_width;
-      priv->surface_height = new_height;
+      priv->surface_width  = real_width;
+      priv->surface_height = real_height;
     }
   else
     {
@@ -1072,13 +1135,14 @@ gtk_image_view_update_surface (GtkImageView    *image_view,
   if (resize)
     gtk_widget_queue_resize ((GtkWidget *)image_view);
   else
-    gtk_widget_queue_resize ((GtkWidget *)image_view);
+    gtk_widget_queue_draw ((GtkWidget *)image_view);
 }
 
 
 static void
 gtk_image_view_load_image_from_stream (GtkImageView *image_view,
                                        GInputStream *input_stream,
+                                       int           scale_factor,
                                        GCancellable *cancellable,
                                        GError       *error)
 {
@@ -1114,14 +1178,16 @@ gtk_image_view_load_image_from_stream (GtkImageView *image_view,
           priv->source_animation_iter = gdk_pixbuf_animation_get_iter (priv->source_animation,
                                                                        NULL);
           gtk_image_view_update_surface (image_view,
-                                         gtk_image_view_get_current_frame (image_view));
+                                         gtk_image_view_get_current_frame (image_view),
+                                         scale_factor);
 
           gtk_image_view_start_animation (image_view);
         }
       else
         {
           gtk_image_view_update_surface (image_view,
-                                         gdk_pixbuf_animation_get_static_image (result));
+                                         gdk_pixbuf_animation_get_static_image (result),
+                                         scale_factor);
         }
     }
 }
@@ -1133,7 +1199,8 @@ gtk_image_view_load_image_contents (GTask        *task,
                                     GCancellable *cancellable)
 {
   GtkImageView *image_view = source_object;
-  GFile *file = task_data;
+  LoadTaskData *data = task_data;
+  GFile *file = (GFile *)data->source;
   GError *error = NULL;
   GFileInputStream *in_stream;
 
@@ -1142,13 +1209,13 @@ gtk_image_view_load_image_contents (GTask        *task,
   if (error)
     {
       g_task_return_error (task, error);
-      g_message ("g_file_read error: %s", error->message);
       return;
     }
 
 
   gtk_image_view_load_image_from_stream (image_view,
                                          G_INPUT_STREAM (in_stream),
+                                         data->scale_factor,
                                          cancellable,
                                          error);
 
@@ -1163,11 +1230,13 @@ gtk_image_view_load_from_input_stream (GTask *task,
                                        GCancellable *cancellable)
 {
   GtkImageView *image_view = source_object;
-  GInputStream *in_stream = task_data;
+  LoadTaskData *data = task_data;
+  GInputStream *in_stream = (GInputStream *)data->source;
   GError *error = NULL;
 
   gtk_image_view_load_image_from_stream (image_view,
                                          in_stream,
+                                         data->scale_factor,
                                          cancellable,
                                          error);
 
@@ -1180,16 +1249,23 @@ gtk_image_view_load_from_input_stream (GTask *task,
 void
 gtk_image_view_load_from_file_async (GtkImageView        *image_view,
                                      GFile               *file,
+                                     int                  scale_factor,
                                      GCancellable        *cancellable,
                                      GAsyncReadyCallback  callback,
                                      gpointer             user_data)
 {
   GTask *task;
+  LoadTaskData *task_data;
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
   g_return_if_fail (G_IS_FILE (file));
+  g_return_if_fail (scale_factor > 0);
+
+  task_data = g_slice_new (LoadTaskData);
+  task_data->scale_factor = scale_factor;
+  task_data->source = file;
 
   task = g_task_new (image_view, cancellable, callback, user_data);
-  g_task_set_task_data (task, file, (GDestroyNotify)g_object_unref);
+  g_task_set_task_data (task, task_data, (GDestroyNotify)free_load_task_data);
   g_task_run_in_thread (task, gtk_image_view_load_image_contents);
 
   g_object_unref (task);
@@ -1208,16 +1284,23 @@ gtk_image_view_load_from_file_finish   (GtkImageView  *image_view,
 void
 gtk_image_view_load_from_stream_async (GtkImageView        *image_view,
                                        GInputStream        *input_stream,
+                                       int                  scale_factor,
                                        GCancellable        *cancellable,
                                        GAsyncReadyCallback  callback,
                                        gpointer             user_data)
 {
   GTask *task;
+  LoadTaskData *task_data;
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
   g_return_if_fail (G_IS_INPUT_STREAM (input_stream));
+  g_return_if_fail (scale_factor > 0);
+
+  task_data = g_slice_new (LoadTaskData);
+  task_data->scale_factor = scale_factor;
+  task_data->source = input_stream;
 
   task = g_task_new (image_view, cancellable, callback, user_data);
-  g_task_set_task_data (task, input_stream, (GDestroyNotify)g_object_unref);
+  g_task_set_task_data (task, task_data, (GDestroyNotify)free_load_task_data);
   g_task_run_in_thread (task, gtk_image_view_load_from_input_stream);
 
   g_object_unref (task);
@@ -1234,11 +1317,12 @@ gtk_image_view_load_from_stream_finish (GtkImageView  *image_view,
 
 void
 gtk_image_view_set_pixbuf (GtkImageView    *image_view,
-                           const GdkPixbuf *pixbuf)
+                           const GdkPixbuf *pixbuf,
+                           int              scale_factor)
 {
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
   g_return_if_fail (GDK_IS_PIXBUF (pixbuf));
 
-  gtk_image_view_update_surface (image_view, pixbuf);
+  gtk_image_view_update_surface (image_view, pixbuf, scale_factor);
 }
 
