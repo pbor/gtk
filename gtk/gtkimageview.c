@@ -59,8 +59,6 @@ struct _GtkImageViewPrivate
 // XXX animate image size changes!
 //
 // XXX Keep track of the inital width/height and use a non-image cairo surface
-// XXX Pass a scaling factor to the loading functions
-//     Means: "The supplied image was designed for this scaling factor"
 // XXX Look for memory leaks
 
 enum
@@ -835,6 +833,23 @@ gtk_image_view_size_allocate (GtkWidget     *widget,
 }
 
 static void
+gtk_image_view_map (GtkWidget *widget)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private ((GtkImageView *)widget);
+
+  GTK_WIDGET_CLASS (gtk_image_view_parent_class)->map (widget);
+}
+
+static void
+gtk_image_view_unmap (GtkWidget *widget)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private ((GtkImageView *)widget);
+
+
+  GTK_WIDGET_CLASS (gtk_image_view_parent_class)->unmap (widget);
+}
+
+static void
 adjustment_value_changed_cb (GtkAdjustment *adjustment,
                              gpointer       user_data)
 {
@@ -1015,6 +1030,8 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
   widget_class->draw          = gtk_image_view_draw;
   widget_class->realize       = gtk_image_view_realize;
   widget_class->size_allocate = gtk_image_view_size_allocate;
+  widget_class->map           = gtk_image_view_map;
+  widget_class->unmap         = gtk_image_view_unmap;
   widget_class->get_preferred_width  = gtk_image_view_get_preferred_width;
   widget_class->get_preferred_height = gtk_image_view_get_preferred_height;
 
@@ -1163,7 +1180,6 @@ gtk_image_view_load_image_from_stream (GtkImageView *image_view,
       if (priv->source_animation)
         {
           g_assert (priv->image_surface);
-          cairo_surface_destroy (priv->image_surface);
           // Cleanup old pixbufanimation, iter, surface, ...
           if (priv->is_animation)
             gtk_image_view_stop_animation (image_view);
@@ -1320,8 +1336,16 @@ gtk_image_view_set_pixbuf (GtkImageView    *image_view,
                            const GdkPixbuf *pixbuf,
                            int              scale_factor)
 {
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
   g_return_if_fail (GDK_IS_PIXBUF (pixbuf));
+
+
+  if (priv->is_animation)
+    {
+      g_clear_object (&priv->source_animation);
+      gtk_image_view_stop_animation (image_view);
+    }
 
   gtk_image_view_update_surface (image_view, pixbuf, scale_factor);
 }
