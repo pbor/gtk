@@ -54,16 +54,16 @@ void gtk_image_view_set_surface (GtkImageView    *image_view,
 /* Loading {{{ */
 
 GDK_AVAILABLE_IN_3_18
-void          gtk_image_view_load_from_file_async    (GtkImageView        *image_view,
-                                                      GFile               *file,
-                                                      int                  scale_factor,
-                                                      GCancellable        *cancellable,
-                                                      GAsyncReadyCallback  callback,
-                                                      gpointer             user_data);
+void gtk_image_view_load_from_file_async    (GtkImageView        *image_view,
+                                             GFile               *file,
+                                             int                  scale_factor,
+                                             GCancellable        *cancellable,
+                                             GAsyncReadyCallback  callback,
+                                             gpointer             user_data);
 GDK_AVAILABLE_IN_3_18
-void          gtk_image_view_load_from_file_finish   (GtkImageView  *image_view,
-                                                      GAsyncResult  *result,
-                                                      GError       **error);
+void  gtk_image_view_load_from_file_finish   (GtkImageView  *image_view,
+                                              GAsyncResult  *result,
+                                              GError       **error);
 GDK_AVAILABLE_IN_3_18
 void gtk_image_view_load_from_stream_async (GtkImageView        *image_view,
                                             GInputStream        *input_stream,
@@ -73,9 +73,9 @@ void gtk_image_view_load_from_stream_async (GtkImageView        *image_view,
                                             gpointer             user_data);
 
 GDK_AVAILABLE_IN_3_18
-void          gtk_image_view_load_from_stream_finish (GtkImageView  *image_view,
-                                                      GAsyncResult  *result,
-                                                      GError       **error);
+void gtk_image_view_load_from_stream_finish (GtkImageView  *image_view,
+                                             GAsyncResult  *result,
+                                             GError       **error);
 
 /* }}} */
 
