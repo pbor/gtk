@@ -131,6 +131,24 @@ load_pixbuf_button_clicked_cb ()
 }
 
 
+void
+load_surface_button_clicked_cb ()
+{
+  GdkPixbuf *pixbuf;
+  cairo_surface_t *surface;
+
+  /* I really hope you have this. */
+  pixbuf = gdk_pixbuf_new_from_file ("/usr/share/backgrounds/gnome/adwaita-day.jpg",
+                                     NULL);
+
+  g_assert (pixbuf != NULL);
+
+  surface = gdk_cairo_surface_create_from_pixbuf (pixbuf, 1, NULL);
+
+  gtk_image_view_set_surface (GTK_IMAGE_VIEW (image_view), surface);
+}
+
+
 
 GtkWidget *
 do_image_view (GtkWidget *do_widget)

@@ -42,12 +42,14 @@ GType         gtk_image_view_get_type (void) G_GNUC_CONST;
 GDK_AVAILABLE_IN_3_18
 GtkWidget *   gtk_image_view_new      ();
 
-
 GDK_AVAILABLE_IN_3_18
 void gtk_image_view_set_pixbuf (GtkImageView    *image_view,
                                 const GdkPixbuf *pixbuf,
                                 int              scale_factor);
 
+GDK_AVAILABLE_IN_3_18
+void gtk_image_view_set_surface (GtkImageView    *image_view,
+                                 cairo_surface_t *surface);
 
 /* Loading {{{ */
 
@@ -129,10 +131,6 @@ void gtk_image_view_set_zoom_gesture_enabled (GtkImageView *image_view,
 
 GDK_AVAILABLE_IN_3_18
 gboolean gtk_image_view_get_zoom_gesture_enabled (GtkImageView *image_view);
-
-// XXX Adding a gtk_image_view_set_pixbuf would work, but we are working with animations internally...
-
-
 
 /* }}} */
 

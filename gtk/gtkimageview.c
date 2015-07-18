@@ -837,6 +837,9 @@ gtk_image_view_map (GtkWidget *widget)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private ((GtkImageView *)widget);
 
+  if (priv->is_animation)
+    gtk_image_view_start_animation ((GtkImageView *)widget);
+
   GTK_WIDGET_CLASS (gtk_image_view_parent_class)->map (widget);
 }
 
@@ -845,6 +848,9 @@ gtk_image_view_unmap (GtkWidget *widget)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private ((GtkImageView *)widget);
 
+
+  if (priv->is_animation)
+    gtk_image_view_stop_animation ((GtkImageView *)widget);
 
   GTK_WIDGET_CLASS (gtk_image_view_parent_class)->unmap (widget);
 }
@@ -1108,6 +1114,23 @@ gtk_image_view_new ()
 
 
 static void
+gtk_image_view_replace_surface (GtkImageView    *image_view,
+                                cairo_surface_t *surface,
+                                int              scale_factor)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+
+  if (priv->image_surface)
+    cairo_surface_destroy (priv->image_surface);
+
+  priv->scale_factor = scale_factor;
+  priv->image_surface = surface;
+  cairo_surface_reference (priv->image_surface);
+  priv->surface_width = cairo_image_surface_get_width (priv->image_surface);
+  priv->surface_height = cairo_image_surface_get_height (priv->image_surface);
+}
+
+static void
 gtk_image_view_update_surface (GtkImageView    *image_view,
                                const GdkPixbuf *frame,
                                int              scale_factor)
@@ -1126,19 +1149,13 @@ gtk_image_view_update_surface (GtkImageView    *image_view,
     {
       GdkWindow *window = gtk_widget_get_window ((GtkWidget *)image_view);
       int surface_scale = gtk_widget_get_scale_factor ((GtkWidget *)image_view);
+      cairo_surface_t *new_surface = gdk_cairo_surface_create_from_pixbuf (frame,
+                                                                           surface_scale,
+                                                                           window);
 
-      if (priv->image_surface)
-        cairo_surface_destroy (priv->image_surface);
-
-      priv->scale_factor  = scale_factor;
-      priv->image_surface = gdk_cairo_surface_create_from_pixbuf (frame,
-                                                                  surface_scale,
-                                                                  window);
-
-
-      cairo_surface_reference (priv->image_surface);
-      priv->surface_width  = real_width;
-      priv->surface_height = real_height;
+      gtk_image_view_replace_surface (image_view,
+                                      new_surface,
+                                      surface_scale);
     }
   else
     {
@@ -1350,3 +1367,27 @@ gtk_image_view_set_pixbuf (GtkImageView    *image_view,
   gtk_image_view_update_surface (image_view, pixbuf, scale_factor);
 }
 
+void
+gtk_image_view_set_surface (GtkImageView    *image_view,
+                            cairo_surface_t *surface)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  double scale_x;
+  double scale_y;
+  g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
+  g_return_if_fail (surface != NULL);
+  g_return_if_fail (cairo_surface_get_type (surface) == CAIRO_SURFACE_TYPE_IMAGE);
+
+
+  cairo_surface_get_device_scale (surface, &scale_x, &scale_y);
+  g_assert (scale_x == scale_y); /* XXX Legal? */
+
+  gtk_image_view_replace_surface (image_view,
+                                  surface,
+                                  scale_x);
+
+  if (priv->fit_allocation)
+    gtk_widget_queue_draw ((GtkWidget *)image_view);
+  else
+    gtk_widget_queue_resize ((GtkWidget *)image_view);
+}
