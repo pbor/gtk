@@ -68,7 +68,7 @@
           <object class="GtkButton">
             <property name="visible">true</property>
             <property name="label" translatable="yes">Load Pixbuf</property>
-            <signal name="clicked" handler="load_pixbuf_button_clicked_cb" />
+            <signal name="clicked" handler="load_pixbuf_button_clicked_cb" object="image_view"/>
           </object>
           <packing>
             <property name="left_attach">0</property>

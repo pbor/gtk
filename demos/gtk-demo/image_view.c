@@ -128,6 +128,8 @@ load_pixbuf_button_clicked_cb ()
 
   g_assert (pixbuf != NULL);
   gtk_image_view_set_pixbuf (GTK_IMAGE_VIEW (image_view), pixbuf, 1);
+
+  g_object_unref (G_OBJECT (pixbuf));
 }
 
 
@@ -144,6 +146,8 @@ load_surface_button_clicked_cb ()
   g_assert (pixbuf != NULL);
 
   surface = gdk_cairo_surface_create_from_pixbuf (pixbuf, 1, NULL);
+
+  g_object_unref (G_OBJECT (pixbuf));
 
   gtk_image_view_set_surface (GTK_IMAGE_VIEW (image_view), surface);
 }
