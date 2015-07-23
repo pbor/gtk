@@ -82,9 +82,12 @@ scrolled_check_button_active_cb (GObject *source)
     {
       GtkWidget *grandparent = gtk_widget_get_parent (parent);
       g_assert (grandparent != NULL);
+      g_object_ref (G_OBJECT (image_view));
+      gtk_container_remove (GTK_CONTAINER (parent), image_view);
       gtk_container_remove (GTK_CONTAINER (grandparent), parent);
       gtk_container_add (GTK_CONTAINER (grandparent), image_view);
       gtk_widget_show (image_view);
+      g_object_unref (G_OBJECT (image_view));
     }
   else
     {
@@ -92,6 +95,7 @@ scrolled_check_button_active_cb (GObject *source)
       gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scroller),
                                       GTK_POLICY_ALWAYS,
                                       GTK_POLICY_ALWAYS);
+      gtk_scrolled_window_set_overlay_scrolling (GTK_SCROLLED_WINDOW (scroller), FALSE);
       gtk_widget_show (scroller);
       gtk_container_remove (GTK_CONTAINER (parent), image_view);
       gtk_container_add (GTK_CONTAINER (scroller), image_view);
@@ -172,7 +176,7 @@ do_image_view (GtkWidget *do_widget)
   GtkAdjustment *angle_adjustment = GTK_ADJUSTMENT (gtk_builder_get_object (builder, "angle_adjustment"));
 
   g_object_bind_property (scale_adjustment, "value", image_view, "scale",
-                          G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
+                          G_BINDING_BIDIRECTIONAL);
   g_object_bind_property (image_view, "angle", angle_adjustment, "value",
                           G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
   g_object_bind_property (image_view, "snap-angle", snap_angle_button, "active",

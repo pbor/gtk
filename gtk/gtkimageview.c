@@ -144,7 +144,7 @@ gtk_image_view_init (GtkImageView *image_view)
   priv->rotate_gesture = gtk_gesture_rotate_new ((GtkWidget *)image_view);
   g_signal_connect (priv->rotate_gesture, "angle-changed", (GCallback)gesture_angle_changed_cb, NULL);
   priv->zoom_gesture = gtk_gesture_zoom_new ((GtkWidget *)image_view);
-  g_signal_connect (priv->zoom_gesture, "zoom-changed", (GCallback)gesture_zoom_changed_cb, NULL);
+  g_signal_connect (priv->zoom_gesture, "scale-changed", (GCallback)gesture_zoom_changed_cb, NULL);
 
   gtk_style_context_add_class (sc, GTK_STYLE_CLASS_BACKGROUND);
 }
@@ -330,16 +330,25 @@ gtk_image_view_compute_bounding_box (GtkImageView *image_view,
   bb_height = MAX (fabs (upper_right_y), fabs (upper_left_y)) * 2;
 
 
-  if (!priv->scale_set)
-    {
-      double scale_x = (double)alloc.width / (double)bb_width;
-      double scale_y = (double)alloc.height / (double)bb_height;
 
-      scale = MIN (MIN (scale_x, scale_y), 1.0);
+
+  if (priv->scale_set)
+    {
+      scale = priv->scale;
     }
   else
     {
-      scale = priv->scale;
+      if (priv->fit_allocation)
+        {
+          double scale_x = (double)alloc.width / (double)bb_width;
+          double scale_y = (double)alloc.height / (double)bb_height;
+
+          scale = MIN (MIN (scale_x, scale_y), 1.0);
+        }
+      else
+        {
+          scale = 1.0;
+        }
     }
 
   if (scale_out)
@@ -363,18 +372,39 @@ gtk_image_view_compute_bounding_box (GtkImageView *image_view,
     }
 }
 
+
+static inline void
+gtk_image_view_restrict_adjustment (GtkAdjustment *adjustment)
+{
+  double value     = gtk_adjustment_get_value (adjustment);
+  double upper     = gtk_adjustment_get_upper (adjustment);
+  double page_size = gtk_adjustment_get_page_size (adjustment);
+
+  value = gtk_adjustment_get_value (adjustment);
+  upper = gtk_adjustment_get_upper (adjustment);
+
+  if (value > upper - page_size)
+    gtk_adjustment_set_value (adjustment, upper - page_size);
+  else if (value < 0)
+    gtk_adjustment_set_value (adjustment, 0);
+
+
+}
+
 static void
 gtk_image_view_update_adjustments (GtkImageView *image_view)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  int widget_width  = gtk_widget_get_allocated_width  ((GtkWidget *)image_view);
+  int widget_height = gtk_widget_get_allocated_height ((GtkWidget *)image_view);
 
   if (!priv->hadjustment && !priv->vadjustment)
     return;
 
   if (!priv->image_surface)
     {
-      gtk_adjustment_configure (priv->vadjustment, 0, 0, 0, 0, 0, 0);
       gtk_adjustment_configure (priv->hadjustment, 0, 0, 0, 0, 0, 0);
+      gtk_adjustment_configure (priv->vadjustment, 0, 0, 0, 0, 0, 0);
       return;
     }
 
@@ -382,8 +412,8 @@ gtk_image_view_update_adjustments (GtkImageView *image_view)
 
   if (priv->fit_allocation)
     {
-      gtk_adjustment_set_upper (priv->vadjustment, 0);
-      gtk_adjustment_set_upper (priv->hadjustment, 0);
+      gtk_adjustment_set_upper (priv->hadjustment, widget_width);
+      gtk_adjustment_set_upper (priv->vadjustment, widget_height);
     }
   else
     {
@@ -392,17 +422,16 @@ gtk_image_view_update_adjustments (GtkImageView *image_view)
                                            &width,
                                            &height,
                                            NULL);
-      gtk_adjustment_set_upper (priv->hadjustment, width);
-      gtk_adjustment_set_upper (priv->vadjustment, height);
-
+      gtk_adjustment_set_upper (priv->hadjustment, MAX (width,  widget_width));
+      gtk_adjustment_set_upper (priv->vadjustment, MAX (height, widget_height));
     }
 
 
-  gtk_adjustment_set_page_size (priv->hadjustment,
-                                gtk_widget_get_allocated_width ((GtkWidget *)image_view));
-  gtk_adjustment_set_page_size (priv->vadjustment,
-                                gtk_widget_get_allocated_height ((GtkWidget *)image_view));
+  gtk_adjustment_set_page_size (priv->hadjustment, widget_width);
+  gtk_adjustment_set_page_size (priv->vadjustment, widget_height);
 
+  gtk_image_view_restrict_adjustment (priv->hadjustment);
+  gtk_image_view_restrict_adjustment (priv->vadjustment);
 }
 
 static gboolean
@@ -411,91 +440,75 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
   GtkImageView *image_view = (GtkImageView *)widget;
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   GtkStyleContext *sc = gtk_widget_get_style_context (widget);
-  GtkAllocation alloc;
   int draw_x;
   int draw_y;
   int draw_width;
   int draw_height;
-  int image_width;
-  int image_height;
   double scale = 0.0;
+  int widget_width = gtk_widget_get_allocated_width (widget);
+  int widget_height = gtk_widget_get_allocated_height (widget);
 
-  gtk_widget_get_allocation (widget, &alloc);
 
-
-  gtk_render_background (sc, ct, 0, 0, alloc.width, alloc.height);
-  gtk_render_frame      (sc, ct, 0, 0, alloc.width, alloc.height);
+  gtk_render_background (sc, ct, 0, 0, widget_width, widget_height);
+  gtk_render_frame      (sc, ct, 0, 0, widget_width, widget_height);
 
   if (!priv->image_surface)
     return GDK_EVENT_PROPAGATE;
 
   gtk_image_view_compute_bounding_box (image_view, &draw_width, &draw_height, &scale);
 
-  image_width  = priv->surface_width  * scale;
-  image_height = priv->surface_height * scale;
 
-  if (image_width == 0 || image_height == 0)
+  if (draw_width == 0 || draw_height == 0)
     return GDK_EVENT_PROPAGATE;
 
 
-  draw_x = (alloc.width  - draw_width) / 2;
-  draw_y = (alloc.height - draw_height) / 2;
-
+  int image_width = priv->surface_width * scale;
+  int image_height = priv->surface_height * scale;
 
 #if 0
-  {
-    cairo_save (ct);
-    cairo_set_source_rgba (ct, 0.7, 0.7, 0.7, 1);
-    cairo_rectangle (ct, (alloc.width - draw_width) / 2, (alloc.height - draw_height) / 2, draw_width, draw_height);
-    cairo_fill (ct);
-    cairo_set_source_rgba (ct, 0, 0, 0, 1);
-    cairo_rectangle (ct, (alloc.width - draw_width) / 2, (alloc.height - draw_height) / 2, draw_width, draw_height);
-    cairo_stroke (ct);
-    cairo_restore (ct);
-  }
-
-  {
-    /*cairo_save (ct);*/
-    /*cairo_set_source_rgba (ct, 1, 0, 0, 1);*/
-    /*cairo_rectangle (ct, ((alloc.width - image_width) / 2)   / scale,*/
-                         /*((alloc.height - image_height) / 2) / scale,*/
-                         /*cairo_image_surface_get_width (priv->image_surface),*/
-                         /*cairo_image_surface_get_height (priv->image_surface));*/
-    /*cairo_stroke (ct);*/
-    /*cairo_restore (ct);*/
-  }
+  cairo_save (ct);
+  cairo_rectangle (ct, draw_x, draw_y, draw_width, draw_height);
+  cairo_set_source_rgba (ct, 0, 1, 0, 1);
+  cairo_stroke (ct);
+  cairo_restore (ct);
 #endif
 
 
-
+  if (priv->vadjustment == NULL)
+    {
+      draw_x = (widget_width - image_width) / 2;
+      draw_y = (widget_height - image_height) / 2;
+    }
+  else
+    {
+      draw_x = (gtk_adjustment_get_page_size (priv->hadjustment) - image_width)  / 2;
+      draw_y = (gtk_adjustment_get_page_size (priv->vadjustment) - image_height) / 2;
+    }
 
   cairo_save (ct);
-  cairo_rectangle (ct, draw_x, draw_y, draw_width, draw_height);
-
-  /* Handle the h/vadjustments, but keep the image centered in all cases */
-
-  /*if (priv->hadjustment &&*/
-      /*gtk_adjustment_get_page_size (priv->hadjustment) < draw_width)*/
-    /*draw_x = -gtk_adjustment_get_value (priv->hadjustment);*/
-  /*else*/
-    draw_x = (alloc.width - image_width) / 2;
+  /*cairo_rectangle (ct, draw_x, draw_y, draw_width, draw_height);*/
+  cairo_rectangle (ct, 0, 0, widget_width, widget_height);
 
 
-  /*if (priv->vadjustment &&*/
-      /*gtk_widget_get_allocated_height (widget) < draw_height)*/
-    /*draw_y = -gtk_adjustment_get_value (priv->vadjustment);*/
-  /*else*/
-    draw_y = (alloc.height - image_height) / 2;
+  if (priv->hadjustment && draw_width >= widget_width)
+    {
+      draw_x = (draw_width - image_width) / 2;
+      draw_x -= gtk_adjustment_get_value (priv->hadjustment);
+    }
 
-    if (priv->vadjustment)
+
+  if (priv->vadjustment && draw_height >= widget_height)
+    {
+      draw_y = (draw_height - image_height) / 2;
       draw_y -= gtk_adjustment_get_value (priv->vadjustment);
+    }
 
 
 
   /* Rotate around the center */
-  cairo_translate (ct, draw_x + (image_width / 2.0), draw_y + (image_height / 2.0));
+  cairo_translate (ct, draw_x + (image_width / 2.0),   draw_y + (image_height / 2.0));
   cairo_rotate (ct, DEG_TO_RAD (priv->angle));
-  cairo_translate (ct, -draw_x - (image_width / 2.0), - draw_y - (image_height / 2.0));
+  cairo_translate (ct, -draw_x - (image_width / 2.0), -draw_y - (image_height / 2.0));
 
 
   cairo_scale (ct, scale, scale);
@@ -535,6 +548,11 @@ gtk_image_view_set_hadjustment (GtkImageView  *image_view,
       priv->hadjustment = hadjustment;
     }
 
+  if (priv->fit_allocation)
+    gtk_widget_queue_draw ((GtkWidget *)image_view);
+  else
+    gtk_widget_queue_resize ((GtkWidget *)image_view);
+
 }
 
 static void
@@ -562,6 +580,11 @@ gtk_image_view_set_vadjustment (GtkImageView  *image_view,
     {
       priv->vadjustment = vadjustment;
     }
+
+  if (priv->fit_allocation)
+    gtk_widget_queue_draw ((GtkWidget *)image_view);
+  else
+    gtk_widget_queue_resize ((GtkWidget *)image_view);
 }
 
 
@@ -626,8 +649,6 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
 
-
-  g_message (__FUNCTION__);
 
   if (priv->snap_angle)
     gtk_image_view_do_snapping (image_view, angle);
@@ -743,6 +764,7 @@ gtk_image_view_set_fit_allocation (GtkImageView *image_view,
   gtk_image_view_update_adjustments (image_view);
 
   gtk_widget_queue_resize ((GtkWidget *)image_view);
+  gtk_image_view_update_adjustments (image_view);
 }
 
 gboolean
@@ -883,6 +905,8 @@ adjustment_value_changed_cb (GtkAdjustment *adjustment,
                              gpointer       user_data)
 {
   GtkImageView *image_view = user_data;
+
+  gtk_image_view_update_adjustments (image_view);
 
   gtk_widget_queue_draw ((GtkWidget *)image_view);
 }
