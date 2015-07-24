@@ -486,6 +486,7 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
     }
 
   cairo_save (ct);
+  /* XXX This is unnecessarily big */
   /*cairo_rectangle (ct, draw_x, draw_y, draw_width, draw_height);*/
   cairo_rectangle (ct, 0, 0, widget_width, widget_height);
 
@@ -1171,9 +1172,13 @@ gtk_image_view_replace_surface (GtkImageView    *image_view,
 
   priv->scale_factor = scale_factor;
   priv->image_surface = surface;
-  cairo_surface_reference (priv->image_surface);
-  priv->surface_width = cairo_image_surface_get_width (priv->image_surface);
-  priv->surface_height = cairo_image_surface_get_height (priv->image_surface);
+
+  if (surface)
+    {
+      cairo_surface_reference (priv->image_surface);
+      priv->surface_width = cairo_image_surface_get_width (priv->image_surface);
+      priv->surface_height = cairo_image_surface_get_height (priv->image_surface);
+    }
 }
 
 static void
@@ -1218,6 +1223,42 @@ gtk_image_view_update_surface (GtkImageView    *image_view,
     gtk_widget_queue_draw ((GtkWidget *)image_view);
 }
 
+static void
+gtk_image_view_replace_animation (GtkImageView       *image_view,
+                                  GdkPixbufAnimation *animation,
+                                  int                 scale_factor)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+
+  if (priv->source_animation)
+    {
+      g_assert (priv->image_surface);
+      if (priv->is_animation)
+        gtk_image_view_stop_animation (image_view);
+    }
+
+  priv->is_animation = !gdk_pixbuf_animation_is_static_image (animation);
+
+  if (priv->is_animation)
+    {
+      priv->source_animation = animation;
+      priv->source_animation_iter = gdk_pixbuf_animation_get_iter (priv->source_animation,
+                                                                   NULL);
+      gtk_image_view_update_surface (image_view,
+                                     gtk_image_view_get_current_frame (image_view),
+                                     scale_factor);
+
+      gtk_image_view_start_animation (image_view);
+    }
+  else
+    {
+      gtk_image_view_update_surface (image_view,
+                                     gdk_pixbuf_animation_get_static_image (animation),
+                                     scale_factor);
+    }
+
+}
+
 
 static void
 gtk_image_view_load_image_from_stream (GtkImageView *image_view,
@@ -1226,7 +1267,6 @@ gtk_image_view_load_image_from_stream (GtkImageView *image_view,
                                        GCancellable *cancellable,
                                        GError       *error)
 {
-  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   GdkPixbufAnimation *result;
   result = gdk_pixbuf_animation_new_from_stream (G_INPUT_STREAM (input_stream),
                                                  cancellable,
@@ -1240,34 +1280,7 @@ gtk_image_view_load_image_from_stream (GtkImageView *image_view,
     }
   else
     {
-      if (priv->source_animation)
-        {
-          g_assert (priv->image_surface);
-          // Cleanup old pixbufanimation, iter, surface, ...
-          if (priv->is_animation)
-            gtk_image_view_stop_animation (image_view);
-
-        }
-      /*g_task_return_pointer (task, result, g_object_unref);*/
-
-      priv->is_animation = !gdk_pixbuf_animation_is_static_image (result);
-      if (priv->is_animation)
-        {
-          priv->source_animation = result;
-          priv->source_animation_iter = gdk_pixbuf_animation_get_iter (priv->source_animation,
-                                                                       NULL);
-          gtk_image_view_update_surface (image_view,
-                                         gtk_image_view_get_current_frame (image_view),
-                                         scale_factor);
-
-          gtk_image_view_start_animation (image_view);
-        }
-      else
-        {
-          gtk_image_view_update_surface (image_view,
-                                         gdk_pixbuf_animation_get_static_image (result),
-                                         scale_factor);
-        }
+      gtk_image_view_replace_animation (image_view, result,scale_factor);
     }
 }
 
@@ -1400,6 +1413,7 @@ gtk_image_view_set_pixbuf (GtkImageView    *image_view,
                            int              scale_factor)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
   g_return_if_fail (GDK_IS_PIXBUF (pixbuf));
 
@@ -1414,20 +1428,36 @@ gtk_image_view_set_pixbuf (GtkImageView    *image_view,
   gtk_image_view_update_surface (image_view, pixbuf, scale_factor);
 }
 
+/**
+ * gtk_image_view_set_surface:
+ * @image_view: A #GtkImageView instance
+ * @surface:(nullable): A #cairo_surface_t of type #CAIRO_SURFACE_TYPE_IMAGE, or
+ *   #NULL to unset any internal image data. In case this is #NULL, the scale will
+ *   be reset to 1.0.
+ */
 void
 gtk_image_view_set_surface (GtkImageView    *image_view,
                             cairo_surface_t *surface)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
-  double scale_x;
-  double scale_y;
+  double scale_x = 0.0;
+
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
-  g_return_if_fail (surface != NULL);
-  g_return_if_fail (cairo_surface_get_type (surface) == CAIRO_SURFACE_TYPE_IMAGE);
+
+  if (surface)
+    {
+      g_return_if_fail (cairo_surface_get_type (surface) == CAIRO_SURFACE_TYPE_IMAGE);
+
+      cairo_surface_get_device_scale (surface, &scale_x, NULL);
+    }
+  else
+    {
+      priv->scale = 1.0;
+      g_object_notify_by_pspec ((GObject *)image_view,
+                                widget_props[PROP_SCALE]);
+    }
 
 
-  cairo_surface_get_device_scale (surface, &scale_x, &scale_y);
-  g_assert (scale_x == scale_y); /* XXX Legal? */
 
   if (priv->is_animation)
     {
@@ -1444,4 +1474,15 @@ gtk_image_view_set_surface (GtkImageView    *image_view,
     gtk_widget_queue_draw ((GtkWidget *)image_view);
   else
     gtk_widget_queue_resize ((GtkWidget *)image_view);
+}
+
+void
+gtk_image_view_set_animation (GtkImageView       *image_view,
+                              GdkPixbufAnimation *animation,
+                              int                 scale_factor)
+{
+  g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
+  g_return_if_fail (GDK_IS_PIXBUF_ANIMATION (animation));
+
+  gtk_image_view_replace_animation (image_view, animation, scale_factor);
 }

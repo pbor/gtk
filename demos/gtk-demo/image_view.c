@@ -157,6 +157,12 @@ load_surface_button_clicked_cb ()
 }
 
 
+void
+clear_button_clicked_cb ()
+{
+  gtk_image_view_set_surface (GTK_IMAGE_VIEW (image_view), NULL);
+}
+
 
 GtkWidget *
 do_image_view (GtkWidget *do_widget)

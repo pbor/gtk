@@ -51,6 +51,12 @@ GDK_AVAILABLE_IN_3_18
 void gtk_image_view_set_surface (GtkImageView    *image_view,
                                  cairo_surface_t *surface);
 
+GDK_AVAILABLE_IN_3_18
+void gtk_image_view_set_animation (GtkImageView       *image_view,
+                                   GdkPixbufAnimation *animation,
+                                   int                 scale_factor);
+
+
 /* Loading {{{ */
 
 GDK_AVAILABLE_IN_3_18
