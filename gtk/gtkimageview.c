@@ -46,7 +46,6 @@ struct _GtkImageViewPrivate
   GdkPixbufAnimation     *source_animation;
   GdkPixbufAnimationIter *source_animation_iter;
   cairo_surface_t        *image_surface;
-  int                     surface_width;
   int                     surface_height;
   int                     animation_timeout;
 
@@ -57,8 +56,7 @@ struct _GtkImageViewPrivate
 };
 
 // XXX animate image size changes!
-//
-// XXX Don't track the surface size
+// XXX Check scale-factor implementation for correctness
 
 enum
 {
@@ -134,8 +132,6 @@ gtk_image_view_init (GtkImageView *image_view)
 
   priv->scale = 1.0;
   priv->angle = 0.0;
-  priv->surface_width = -1;
-  priv->surface_height = -1;
   priv->snap_angle = FALSE;
   priv->fit_allocation = FALSE;
   priv->scale_set = FALSE;
@@ -312,8 +308,8 @@ gtk_image_view_compute_bounding_box (GtkImageView *image_view,
     }
 
   gtk_widget_get_allocation ((GtkWidget *)image_view, &alloc);
-  image_width  = priv->surface_width;
-  image_height = priv->surface_height;
+  image_width  = cairo_image_surface_get_width (priv->image_surface);
+  image_height = cairo_image_surface_get_height (priv->image_surface);
 
   upper_right_degrees = DEG_TO_RAD (priv->angle) + atan ((double)image_height / (double)image_width);
   upper_left_degrees  = DEG_TO_RAD (priv->angle) + atan ((double)image_height / -(double)image_width);
@@ -403,17 +399,25 @@ gtk_image_view_update_adjustments (GtkImageView *image_view)
 
   if (!priv->image_surface)
     {
-      gtk_adjustment_configure (priv->hadjustment, 0, 0, 0, 0, 0, 0);
-      gtk_adjustment_configure (priv->vadjustment, 0, 0, 0, 0, 0, 0);
+      /* XXX Rework this so the scrollbars just take max size? */
+      if (priv->hadjustment)
+        gtk_adjustment_configure (priv->hadjustment, 0, 0, 0, 0, 0, 0);
+
+      if (priv->vadjustment)
+        gtk_adjustment_configure (priv->vadjustment, 0, 0, 0, 0, 0, 0);
       return;
     }
 
 
 
+
   if (priv->fit_allocation)
     {
-      gtk_adjustment_set_upper (priv->hadjustment, widget_width);
-      gtk_adjustment_set_upper (priv->vadjustment, widget_height);
+      if (priv->hadjustment)
+        gtk_adjustment_set_upper (priv->hadjustment, widget_width);
+
+      if (priv->vadjustment)
+        gtk_adjustment_set_upper (priv->vadjustment, widget_height);
     }
   else
     {
@@ -422,16 +426,26 @@ gtk_image_view_update_adjustments (GtkImageView *image_view)
                                            &width,
                                            &height,
                                            NULL);
-      gtk_adjustment_set_upper (priv->hadjustment, MAX (width,  widget_width));
-      gtk_adjustment_set_upper (priv->vadjustment, MAX (height, widget_height));
+
+      if (priv->hadjustment)
+        gtk_adjustment_set_upper (priv->hadjustment, MAX (width,  widget_width));
+
+      if (priv->vadjustment)
+        gtk_adjustment_set_upper (priv->vadjustment, MAX (height, widget_height));
     }
 
 
-  gtk_adjustment_set_page_size (priv->hadjustment, widget_width);
-  gtk_adjustment_set_page_size (priv->vadjustment, widget_height);
+  if (priv->hadjustment)
+    {
+      gtk_adjustment_set_page_size (priv->hadjustment, widget_width);
+      gtk_image_view_restrict_adjustment (priv->hadjustment);
+    }
 
-  gtk_image_view_restrict_adjustment (priv->hadjustment);
-  gtk_image_view_restrict_adjustment (priv->vadjustment);
+  if (priv->vadjustment)
+    {
+      gtk_adjustment_set_page_size (priv->vadjustment, widget_height);
+      gtk_image_view_restrict_adjustment (priv->vadjustment);
+    }
 }
 
 static gboolean
@@ -462,8 +476,8 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
     return GDK_EVENT_PROPAGATE;
 
 
-  int image_width = priv->surface_width * scale;
-  int image_height = priv->surface_height * scale;
+  int image_width  = cairo_image_surface_get_width (priv->image_surface)  * scale;
+  int image_height = cairo_image_surface_get_height (priv->image_surface) * scale;
 
 #if 0
   cairo_save (ct);
@@ -549,6 +563,10 @@ gtk_image_view_set_hadjustment (GtkImageView  *image_view,
       priv->hadjustment = hadjustment;
     }
 
+  g_object_notify ((GObject *)image_view, "hadjustment");
+
+  gtk_image_view_update_adjustments (image_view);
+
   if (priv->fit_allocation)
     gtk_widget_queue_draw ((GtkWidget *)image_view);
   else
@@ -582,12 +600,41 @@ gtk_image_view_set_vadjustment (GtkImageView  *image_view,
       priv->vadjustment = vadjustment;
     }
 
+  g_object_notify ((GObject *)image_view, "vadjustment");
+
+  gtk_image_view_update_adjustments (image_view);
+
   if (priv->fit_allocation)
     gtk_widget_queue_draw ((GtkWidget *)image_view);
   else
     gtk_widget_queue_resize ((GtkWidget *)image_view);
 }
 
+static void
+gtk_image_view_set_hscroll_policy (GtkImageView        *image_view,
+                                   GtkScrollablePolicy  hscroll_policy)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+
+  if (priv->hscroll_policy == hscroll_policy)
+    return;
+
+  priv->hscroll_policy = hscroll_policy;
+  gtk_image_view_update_adjustments (image_view);
+}
+
+static void
+gtk_image_view_set_vscroll_policy (GtkImageView        *image_view,
+                                   GtkScrollablePolicy  vscroll_policy)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+
+  if (priv->vscroll_policy == vscroll_policy)
+    return;
+
+  priv->vscroll_policy = vscroll_policy;
+  gtk_image_view_update_adjustments (image_view);
+}
 
 
 /**
@@ -997,10 +1044,10 @@ gtk_image_view_set_property (GObject      *object,
         gtk_image_view_set_vadjustment (image_view, g_value_get_object (value));
         break;
       case PROP_HSCROLL_POLICY:
-        ;
+        gtk_image_view_set_hscroll_policy (image_view, g_value_get_enum (value));
         break;
       case PROP_VSCROLL_POLICY:
-        ;
+        gtk_image_view_set_vscroll_policy (image_view, g_value_get_enum (value));
         break;
       default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1037,10 +1084,10 @@ gtk_image_view_get_property (GObject    *object,
         g_value_set_object (value, priv->vadjustment);
         break;
       case PROP_HSCROLL_POLICY:
-        ;
+        g_value_set_enum (value, priv->hscroll_policy);
         break;
       case PROP_VSCROLL_POLICY:
-        ;
+        g_value_set_enum (value, priv->vscroll_policy);
         break;
       default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1088,20 +1135,41 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
   widget_class->get_preferred_width  = gtk_image_view_get_preferred_width;
   widget_class->get_preferred_height = gtk_image_view_get_preferred_height;
 
+  /**
+   * GtkImageView:scale:
+   * The scale the internal surface gets drawn with.
+   *
+   * Since: 3.18
+   */
   widget_props[PROP_SCALE] = g_param_spec_double ("scale",
                                                   P_("Scale"),
-                                                  P_("foobar scale"),
-                                                  -G_MAXDOUBLE,
-                                                  G_MAXDOUBLE,
+                                                  P_("The scale the internal surface gets drawn with"),
                                                   0.0,
+                                                  G_MAXDOUBLE,
+                                                  1.0,
                                                   GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
-
+  /**
+   * GtkImageView:scale-set:
+   * Whether or not the current value of the scale property was set by the user.
+   * This is to distringuish between scale values set by the GtkImageView itself,
+   * e.g. when fit-allocation is true, which will change the scale depeding on the
+   * widget allocation.
+   *
+   * Since: 3.18
+   */
   widget_props[PROP_SCALE_SET] = g_param_spec_boolean ("scale-set",
-                                                       P_("Foo"),
+                                                       P_(""),
                                                        P_("fooar"),
-                                                       TRUE,
+                                                       FALSE,
                                                        GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
-
+  /**
+   * GtkImageView:angle:
+   * The angle the surface gets rotated about.
+   * This is in degrees and we rotate in the mathematically negative direction,
+   * i.e. clock wise.
+   *
+   * Since: 3.18
+   */
   widget_props[PROP_ANGLE] = g_param_spec_double ("angle",
                                                   P_("angle"),
                                                   P_("angle"),
@@ -1109,25 +1177,51 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
                                                   G_MAXDOUBLE,
                                                   0.0,
                                                   GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
-
+  /**
+   * GtkImageView:rotate-gesture-enabled:
+   * Whether or not the image can be rotated using a two-finger rotate gesture.
+   *
+   * Since: 3.18
+   */
   widget_props[PROP_ROTATE_GESTURE_ENABLED] = g_param_spec_boolean ("rotate-gesture-enabled",
                                                                     P_("Foo"),
                                                                     P_("fooar"),
                                                                     TRUE,
                                                                     GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
+  /**
+   * GtkImageView:zoom-gesture-enabled:
+   * Whether or not image can be scaled using a two-finger zoom gesture or not.
+   *
+   * Since: 3.18
+   */
   widget_props[PROP_ZOOM_GESTURE_ENABLED] = g_param_spec_boolean ("zoom-gesture-enabled",
                                                                   P_("Foo"),
                                                                   P_("fooar"),
                                                                   TRUE,
                                                                   GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
-
+  /**
+   * GtkImageView:snap-angle:
+   * Whether or not the angle property snaps to 90° steps. If this is enabled
+   * and the angle property gets set to a non-90° step, the new value will be
+   * set to the closest 90° step that is lower than the given angle.
+   * Changing the angle from one 90° step to another will be transitioned. XXX
+   *
+   * Since: 3.18
+   */
   widget_props[PROP_SNAP_ANGLE] = g_param_spec_boolean ("snap-angle",
                                                         P_("Foo"),
                                                         P_("fooar"),
                                                         FALSE,
                                                         GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
 
-
+  /**
+   * GtkImageView:fit-allocation:
+   * If this is TRUE, the scale the image will be drawn in will depend on the current
+   * widget allocation. The image will be scaled down to fit into the widget allocation,
+   * but never scaled up.
+   *
+   * Since: 3.18
+   */
   widget_props[PROP_FIT_ALLOCATION] = g_param_spec_boolean ("fit-allocation",
                                                             P_("Foo"),
                                                             P_("fooar"),
@@ -1135,15 +1229,17 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
                                                             GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
 
 
-
-
+  /**
+   * GtkImageView::prepare-image:
+   * @image_view: The #GtkImageView instance
+   * @surface: A #cairo_surface_t of type #CAIRO_TYPE_IMAGE_SURFACE.
+   */
   widget_signals[PREPARE_IMAGE] = g_signal_new (I_("prepare-image"),
                                                 G_TYPE_FROM_CLASS (object_class),
                                                 G_SIGNAL_RUN_LAST,
                                                 G_STRUCT_OFFSET (GtkImageViewClass, prepare_image),
-                                                NULL, NULL,
-                                                _gtk_marshal_VOID__VOID,
-                                                G_TYPE_NONE, 0);
+                                                NULL, NULL, NULL,
+                                                G_TYPE_NONE, 1, CAIRO_GOBJECT_TYPE_SURFACE);
 
   g_object_class_install_properties (object_class, LAST_WIDGET_PROPERTY, widget_props);
 
@@ -1158,7 +1254,6 @@ gtk_image_view_new ()
 {
   return g_object_new (GTK_TYPE_IMAGE_VIEW, NULL);
 }
-
 
 static void
 gtk_image_view_replace_surface (GtkImageView    *image_view,
@@ -1176,8 +1271,8 @@ gtk_image_view_replace_surface (GtkImageView    *image_view,
   if (surface)
     {
       cairo_surface_reference (priv->image_surface);
-      priv->surface_width = cairo_image_surface_get_width (priv->image_surface);
-      priv->surface_height = cairo_image_surface_get_height (priv->image_surface);
+
+      g_signal_emit (image_view, widget_signals[PREPARE_IMAGE], 0, priv->image_surface);
     }
 }
 
@@ -1195,15 +1290,16 @@ gtk_image_view_update_surface (GtkImageView    *image_view,
   int real_height  = (new_height * scale_factor) / widget_scale;
 
   if (!priv->image_surface ||
-      priv->surface_width  != real_width ||
-      priv->surface_height != real_height)
+      cairo_image_surface_get_width (priv->image_surface)  != real_width ||
+      cairo_image_surface_get_height (priv->image_surface) != real_height)
     {
       GdkWindow *window = gtk_widget_get_window ((GtkWidget *)image_view);
       int surface_scale = gtk_widget_get_scale_factor ((GtkWidget *)image_view);
       cairo_surface_t *new_surface = gdk_cairo_surface_create_from_pixbuf (frame,
                                                                            surface_scale,
                                                                            window);
-
+      g_assert (new_surface != NULL);
+      /* replace_surface will emit prepare-image */
       gtk_image_view_replace_surface (image_view,
                                       new_surface,
                                       surface_scale);
@@ -1211,11 +1307,11 @@ gtk_image_view_update_surface (GtkImageView    *image_view,
   else
     {
       gdk_cairo_surface_paint_pixbuf (priv->image_surface, frame);
+      g_signal_emit (image_view, widget_signals[PREPARE_IMAGE], 0, priv->image_surface);
       resize = FALSE;
     }
   g_assert (priv->image_surface != NULL);
 
-  g_signal_emit (image_view, widget_signals[PREPARE_IMAGE], 0, priv->image_surface);
 
   if (resize)
     gtk_widget_queue_resize ((GtkWidget *)image_view);
@@ -1260,6 +1356,7 @@ gtk_image_view_replace_animation (GtkImageView       *image_view,
 }
 
 
+
 static void
 gtk_image_view_load_image_from_stream (GtkImageView *image_view,
                                        GInputStream *input_stream,
@@ -1268,20 +1365,16 @@ gtk_image_view_load_image_from_stream (GtkImageView *image_view,
                                        GError       *error)
 {
   GdkPixbufAnimation *result;
+
+
+  g_assert (error == NULL);
   result = gdk_pixbuf_animation_new_from_stream (G_INPUT_STREAM (input_stream),
                                                  cancellable,
                                                  &error);
 
   g_object_unref (input_stream);
-  if (error)
-    {
-      // XXX
-      g_error ("error!");
-    }
-  else
-    {
-      gtk_image_view_replace_animation (image_view, result,scale_factor);
-    }
+  if (!error)
+    gtk_image_view_replace_animation (image_view, result,scale_factor);
 }
 
 static void
@@ -1405,8 +1498,16 @@ gtk_image_view_load_from_stream_finish (GtkImageView  *image_view,
   g_return_if_fail (g_task_is_valid (result, image_view));
 }
 
-
-
+/*
+ * gtk_image_view_set_pixbuf:
+ * @image_view: A #GtkImageView instance
+ * @pixbuf: A #GdkPixbuf instance
+ * @scale_factor: The scale factor of the pixbuf. This will
+ *   be interpreted as "the given pixbuf is supposed to be used
+ *   with the given scale factor", i.e. if the pixbuf's scale
+ *   factor is 2, and the screen's scale factor is also 2, the
+ *   pixbuf won't be scaled up.
+ */
 void
 gtk_image_view_set_pixbuf (GtkImageView    *image_view,
                            const GdkPixbuf *pixbuf,
@@ -1431,7 +1532,7 @@ gtk_image_view_set_pixbuf (GtkImageView    *image_view,
 /**
  * gtk_image_view_set_surface:
  * @image_view: A #GtkImageView instance
- * @surface:(nullable): A #cairo_surface_t of type #CAIRO_SURFACE_TYPE_IMAGE, or
+ * @surface: (nullable): A #cairo_surface_t of type #CAIRO_SURFACE_TYPE_IMAGE, or
  *   #NULL to unset any internal image data. In case this is #NULL, the scale will
  *   be reset to 1.0.
  */
@@ -1476,6 +1577,16 @@ gtk_image_view_set_surface (GtkImageView    *image_view,
     gtk_widget_queue_resize ((GtkWidget *)image_view);
 }
 
+/**
+ * gtk_image_view_set_animation:
+ * @image_view: A #GtkImageView instance
+ * @animation: The #GdkAnimation to use
+ * @scale_factor: The scale factor of the animation. This will
+ *   be interpreted as "the given animation is supposed to be used
+ *   with the given scale factor", i.e. if the animation's scale
+ *   factor is 2, and the screen's scale factor is also 2, the
+ *   animation won't be scaled up.
+ */
 void
 gtk_image_view_set_animation (GtkImageView       *image_view,
                               GdkPixbufAnimation *animation,

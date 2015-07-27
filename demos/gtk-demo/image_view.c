@@ -163,6 +163,31 @@ clear_button_clicked_cb ()
   gtk_image_view_set_surface (GTK_IMAGE_VIEW (image_view), NULL);
 }
 
+void
+prepare_image_cb (GtkImageView    *image_view,
+                  cairo_surface_t *surface)
+{
+  cairo_t *ct;
+  int width;
+  int height;
+
+  g_assert (GTK_IS_IMAGE_VIEW (image_view));
+
+  g_assert (surface != NULL);
+  g_assert (cairo_surface_get_type (surface) == CAIRO_SURFACE_TYPE_IMAGE);
+
+
+  ct = cairo_create (surface);
+  width  = cairo_image_surface_get_width (surface);
+  height = cairo_image_surface_get_height (surface);
+
+
+  cairo_set_source_rgba (ct, 0, 1, 0, 1);
+  cairo_set_line_width (ct, 5.0);
+  cairo_rectangle (ct, 0, 0, width, height);
+  cairo_stroke (ct);
+}
+
 
 GtkWidget *
 do_image_view (GtkWidget *do_widget)
@@ -180,6 +205,10 @@ do_image_view (GtkWidget *do_widget)
 
   GtkAdjustment *scale_adjustment = GTK_ADJUSTMENT (gtk_builder_get_object (builder, "scale_adjustment"));
   GtkAdjustment *angle_adjustment = GTK_ADJUSTMENT (gtk_builder_get_object (builder, "angle_adjustment"));
+
+
+  g_signal_connect (G_OBJECT (image_view), "prepare-image", G_CALLBACK (prepare_image_cb), NULL);
+
 
   g_object_bind_property (scale_adjustment, "value", image_view, "scale",
                           G_BINDING_BIDIRECTIONAL);
