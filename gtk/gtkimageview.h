@@ -40,7 +40,7 @@ GDK_AVAILABLE_IN_3_18
 GType         gtk_image_view_get_type (void) G_GNUC_CONST;
 
 GDK_AVAILABLE_IN_3_18
-GtkWidget *   gtk_image_view_new      ();
+GtkWidget *   gtk_image_view_new      (void);
 
 GDK_AVAILABLE_IN_3_18
 void gtk_image_view_set_pixbuf (GtkImageView    *image_view,
@@ -109,7 +109,7 @@ void gtk_image_view_set_snap_angle (GtkImageView *image_view,
                                     gboolean      snap_angle);
 
 GDK_AVAILABLE_IN_3_18
-gboolean gtk_image_get_view_snap_angle (GtkImageView *image_view);
+gboolean gtk_image_view_get_snap_angle (GtkImageView *image_view);
 
 
 

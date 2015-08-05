@@ -16,6 +16,12 @@
 #include <cairo-gobject.h>
 #include <math.h>
 
+int _old_x;
+int _old_y;
+
+int _new_x;
+int _new_y;
+
 
 #define DEG_TO_RAD(x) (((x) / 360.0) * (2 * M_PI))
 #define RAD_TO_DEG(x) ((x / (2.0 * M_PI) * 360.0))
@@ -56,6 +62,7 @@ struct _GtkImageViewPrivate
 };
 
 // XXX animate image size changes!
+// XXX Actually honour the scroll policies
 // XXX Check scale-factor implementation for correctness
 
 enum
@@ -142,7 +149,7 @@ gtk_image_view_init (GtkImageView *image_view)
   priv->zoom_gesture = gtk_gesture_zoom_new ((GtkWidget *)image_view);
   g_signal_connect (priv->zoom_gesture, "scale-changed", (GCallback)gesture_zoom_changed_cb, NULL);
 
-  gtk_style_context_add_class (sc, GTK_STYLE_CLASS_BACKGROUND);
+  gtk_style_context_add_class (sc, "image-view");
 }
 
 /* Prototypes {{{ */
@@ -463,6 +470,7 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
   int widget_height = gtk_widget_get_allocated_height (widget);
 
 
+  /* XXX Take the upper here in case we have adjustments */
   gtk_render_background (sc, ct, 0, 0, widget_width, widget_height);
   gtk_render_frame      (sc, ct, 0, 0, widget_width, widget_height);
 
@@ -479,16 +487,7 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
   int image_width  = cairo_image_surface_get_width (priv->image_surface)  * scale;
   int image_height = cairo_image_surface_get_height (priv->image_surface) * scale;
 
-#if 0
-  cairo_save (ct);
-  cairo_rectangle (ct, draw_x, draw_y, draw_width, draw_height);
-  cairo_set_source_rgba (ct, 0, 1, 0, 1);
-  cairo_stroke (ct);
-  cairo_restore (ct);
-#endif
-
-
-  if (priv->vadjustment == NULL)
+  if (priv->vadjustment == NULL) // XXX Check both here?
     {
       draw_x = (widget_width - image_width) / 2;
       draw_y = (widget_height - image_height) / 2;
@@ -531,6 +530,24 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
   cairo_pattern_set_filter (cairo_get_source (ct), CAIRO_FILTER_FAST);
   cairo_fill (ct);
   cairo_restore (ct);
+
+
+
+
+#if 1
+  g_message ("old_x: %d,old_y: %d", _old_x, _old_y);
+  cairo_set_source_rgba (ct, 1, 0, 0, 1);
+  cairo_rectangle (ct, _old_x - 2, _old_y - 2, 4, 4);
+  cairo_fill (ct);
+
+  cairo_set_source_rgba (ct, 0, 0, 1, 1);
+  cairo_rectangle (ct, _new_x - 2, _new_y - 2, 4, 4);
+  cairo_fill (ct);
+#endif
+
+
+
+
 
   return GDK_EVENT_PROPAGATE;
 }
@@ -637,9 +654,49 @@ gtk_image_view_set_vscroll_policy (GtkImageView        *image_view,
 }
 
 
+static void
+gtk_image_view_fix_point (GtkImageView *image_view,
+                          double        scale_before,
+                          int           x_before,
+                          int           y_before)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  int x_after;
+  int y_after;
+  double  scale_diff = priv->scale - scale_before;
+
+  g_assert (!(priv->hadjustment == NULL && priv->vadjustment == NULL));
+
+
+  /* We need to take the point (x_before, y_before), which now got moved
+   * around because we changed the scale (XXX and the adjustment value?!),
+   * and we need to move that point (on the drawn surface) to where it
+   * was before.
+   */
+
+
+
+  x_after = x_before + x_before * scale_diff;
+  y_after = y_before + y_before * scale_diff;
+
+
+#if 1
+  _old_x = x_before;
+  _old_y = y_before;
+
+
+  _new_x = x_after;
+  _new_y = y_after;
+
+  gtk_widget_queue_draw ((GtkWidget *)image_view);
+
+#endif
+}
+
+
 /**
  * gtk_image_view_set_scale:
- * @image_view: A #GtkImageView
+ * @image_view: A #GtkImageView instance
  * @scale: The new scale value
  *
  * Sets the value of the #scale property. This will cause the
@@ -728,7 +785,7 @@ gtk_image_view_get_angle (GtkImageView *image_view)
 
 /**
  * gtk_image_view_set_snap_angle:
- * @image_view: A #GtkImageView
+ * @image_view: A #GtkImageView instance
  * @snap_angle: The new value of the #snap-angle property
  *
  * Setting #snap-angle to #TRUE will cause @image_view's  angle to
@@ -769,7 +826,7 @@ gtk_image_view_get_snap_angle (GtkImageView *image_view)
 
 /**
  * gtk_image_view_set_fit_allocation:
- * @image_view: A #GtkImageView
+ * @image_view: A #GtkImageView instance
  * @fit_allocation: The new value of the #fit-allocation property.
  *
  * Setting #fit-allocation to #TRUE will cause the image to be scaled
@@ -1010,6 +1067,38 @@ gtk_image_view_get_preferred_width (GtkWidget *widget,
     }
 
 }
+
+
+
+#define SCROLL_FACTOR (0.05)
+static gboolean
+gtk_image_view_scroll_event (GtkWidget       *widget,
+                             GdkEventScroll  *event)
+{
+  GtkImageView *image_view = (GtkImageView *)widget;
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  int x = event->x;
+  int y = event->y;
+  double old_scale = priv->scale;
+  double new_scale = priv->scale - (0.1 * event->delta_y);
+
+
+  gtk_image_view_set_scale (image_view, new_scale);
+
+  if (priv->hadjustment)
+    x += gtk_adjustment_get_value (priv->hadjustment);
+
+  if (priv->vadjustment)
+    y += gtk_adjustment_get_value (priv->vadjustment);
+
+
+  if (priv->hadjustment || priv->vadjustment)
+    gtk_image_view_fix_point (image_view, old_scale, x, y);
+
+
+  return TRUE;
+}
+
 /* }}} */
 
 
@@ -1132,6 +1221,7 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
   widget_class->size_allocate = gtk_image_view_size_allocate;
   widget_class->map           = gtk_image_view_map;
   widget_class->unmap         = gtk_image_view_unmap;
+  widget_class->scroll_event  = gtk_image_view_scroll_event;
   widget_class->get_preferred_width  = gtk_image_view_get_preferred_width;
   widget_class->get_preferred_height = gtk_image_view_get_preferred_height;
 
@@ -1231,7 +1321,7 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
 
   /**
    * GtkImageView::prepare-image:
-   * @image_view: The #GtkImageView instance
+   * @image_view: A #GtkImageView instance
    * @surface: A #cairo_surface_t of type #CAIRO_TYPE_IMAGE_SURFACE.
    */
   widget_signals[PREPARE_IMAGE] = g_signal_new (I_("prepare-image"),
