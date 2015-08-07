@@ -110,7 +110,7 @@ struct _LoadTaskData
 static void
 free_load_task_data (LoadTaskData *data)
 {
-  g_clear_object ((&data->source));
+  g_clear_object (&data->source);
 }
 
 static void
@@ -535,7 +535,7 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
 
 
 #if 1
-  g_message ("old_x: %d,old_y: %d", _old_x, _old_y);
+  /*g_message ("old_x: %d,old_y: %d", _old_x, _old_y);*/
   cairo_set_source_rgba (ct, 1, 0, 0, 1);
   cairo_rectangle (ct, _old_x - 2, _old_y - 2, 4, 4);
   cairo_fill (ct);
@@ -661,32 +661,53 @@ gtk_image_view_fix_point (GtkImageView *image_view,
                           int           y_before)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
-  int x_after;
-  int y_after;
+  double x_after;
+  double y_after;
+  double x_value;
+  double y_value;
   double  scale_diff = priv->scale - scale_before;
 
   g_assert (!(priv->hadjustment == NULL && priv->vadjustment == NULL));
 
 
-  /* We need to take the point (x_before, y_before), which now got moved
-   * around because we changed the scale (XXX and the adjustment value?!),
-   * and we need to move that point (on the drawn surface) to where it
-   * was before.
-   */
+  x_value = gtk_adjustment_get_value (priv->hadjustment);
+  y_value = gtk_adjustment_get_value (priv->vadjustment);
 
 
 
-  x_after = x_before + x_before * scale_diff;
-  y_after = y_before + y_before * scale_diff;
+  /*x_after = (x_value + x_before) * (1 + scale_diff);*/
+  /*y_after = (y_value + y_before) * (1 + scale_diff);*/
 
 
-#if 1
-  _old_x = x_before;
-  _old_y = y_before;
+  x_after = (x_before) * (1 + scale_diff);
+  y_after = (y_before) * (1 + scale_diff);
 
 
-  _new_x = x_after;
-  _new_y = y_after;
+  double x_diff = x_after - (x_before);
+  double y_diff = y_after - (y_before);
+
+  g_message ("x_diff: %f", x_diff);
+  gtk_adjustment_set_value (priv->hadjustment,
+                            x_value + x_diff);
+  gtk_adjustment_set_value (priv->vadjustment,
+                            y_value + y_diff);
+  /*gtk_adjustment_set_value (priv->hadjustment,*/
+                            /*x_value + x_diff);*/
+
+  /*gtk_adjustment_set_value (priv->vadjustment,*/
+                            /*gtk_adjustment_get_value (priv->vadjustment) + y_diff);*/
+
+
+  gtk_widget_queue_draw ((GtkWidget *)image_view);
+
+
+#if 0
+  _old_x = x_before - gtk_adjustment_get_value (priv->hadjustment);
+  _old_y = y_before - gtk_adjustment_get_value (priv->vadjustment);
+
+
+  _new_x = x_after - gtk_adjustment_get_value (priv->hadjustment);
+  _new_y = y_after - gtk_adjustment_get_value (priv->vadjustment);
 
   gtk_widget_queue_draw ((GtkWidget *)image_view);
 
@@ -712,6 +733,10 @@ gtk_image_view_set_scale (GtkImageView *image_view,
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
+
+  /* XXX Do we have to do this here? */
+  scale = MAX (0, scale);
+
 
   priv->scale = scale;
   g_object_notify_by_pspec ((GObject *)image_view,
@@ -1069,8 +1094,6 @@ gtk_image_view_get_preferred_width (GtkWidget *widget,
 }
 
 
-
-#define SCROLL_FACTOR (0.05)
 static gboolean
 gtk_image_view_scroll_event (GtkWidget       *widget,
                              GdkEventScroll  *event)
@@ -1085,18 +1108,22 @@ gtk_image_view_scroll_event (GtkWidget       *widget,
 
   gtk_image_view_set_scale (image_view, new_scale);
 
-  if (priv->hadjustment)
-    x += gtk_adjustment_get_value (priv->hadjustment);
+  /*if (priv->hadjustment)*/
+    /*x += gtk_adjustment_get_value (priv->hadjustment);*/
 
-  if (priv->vadjustment)
-    y += gtk_adjustment_get_value (priv->vadjustment);
+  /*if (priv->vadjustment)*/
+    /*y += gtk_adjustment_get_value (priv->vadjustment);*/
+
+
+  /*x += gtk_adjustment_get_value (priv->hadjustment);*/
+  /*y += gtk_adjustment_get_value (priv->vadjustment);*/
 
 
   if (priv->hadjustment || priv->vadjustment)
     gtk_image_view_fix_point (image_view, old_scale, x, y);
 
 
-  return TRUE;
+  return GDK_EVENT_STOP;
 }
 
 /* }}} */
@@ -1632,6 +1659,7 @@ gtk_image_view_set_surface (GtkImageView    *image_view,
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   double scale_x = 0.0;
+  double scale_y;
 
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
 
@@ -1639,7 +1667,9 @@ gtk_image_view_set_surface (GtkImageView    *image_view,
     {
       g_return_if_fail (cairo_surface_get_type (surface) == CAIRO_SURFACE_TYPE_IMAGE);
 
-      cairo_surface_get_device_scale (surface, &scale_x, NULL);
+      cairo_surface_get_device_scale (surface, &scale_x, &scale_y);
+
+      g_return_if_fail (scale_x == scale_y);
     }
   else
     {
