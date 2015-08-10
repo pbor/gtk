@@ -33,6 +33,8 @@ struct _GtkImageViewPrivate
   gboolean zoom_gesture_enabled;
 
   GtkGesture *rotate_gesture;
+  gboolean    in_rotate;
+  double      rotate_start_angle;
   GtkGesture *zoom_gesture;
 
   GdkWindow *event_window;
@@ -142,17 +144,32 @@ gtk_image_view_fix_point (GtkImageView *image_view,
 }
 
 static void
+gesture_rotate_end_cb (GtkGesture       *gesture,
+                       GdkEventSequence *sequence,
+                       gpointer          user_data)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private ((GtkImageView *)user_data);
+
+  priv->rotate_start_angle = 0.0;
+  priv->in_rotate = FALSE;
+}
+
+
+static void
 gesture_angle_changed_cb (GtkGestureRotate *gesture,
                           double            angle,
                           double            delta,
                           GtkWidget        *widget)
 {
-  g_message ("Angle changed. Angle: %f, delta: %f", angle, delta);
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private ((GtkImageView *)widget);
 
-  double new_angle = RAD_TO_DEG (DEG_TO_RAD (gtk_image_view_get_angle ((GtkImageView *)widget)) +  delta);
+  if (!priv->in_rotate)
+    {
+      priv->in_rotate = TRUE;
+      priv->rotate_start_angle = priv->angle;
+    }
 
-
-  g_message ("New angle: %f", new_angle);
+  double new_angle = priv->rotate_start_angle + RAD_TO_DEG (delta);
 
   gtk_image_view_set_angle ((GtkImageView *)widget,
                             new_angle);
@@ -205,6 +222,7 @@ gtk_image_view_init (GtkImageView *image_view)
   gtk_event_controller_set_propagation_phase ((GtkEventController *)priv->rotate_gesture,
                                               GTK_PHASE_CAPTURE);
   g_signal_connect (priv->rotate_gesture, "angle-changed", (GCallback)gesture_angle_changed_cb, image_view);
+  g_signal_connect (priv->rotate_gesture, "end", (GCallback)gesture_rotate_end_cb, image_view);
   priv->zoom_gesture = gtk_gesture_zoom_new ((GtkWidget *)image_view);
   g_signal_connect (priv->zoom_gesture, "scale-changed", (GCallback)gesture_zoom_changed_cb, image_view);
 
@@ -1087,48 +1105,6 @@ gtk_image_view_get_preferred_width (GtkWidget *widget,
 }
 
 
-int m_x = 0;
-int m_y = 0;
-
-static gboolean
-gtk_image_view_motion (GtkWidget      *widget,
-                       GdkEventMotion *event,
-                       gpointer        user_data)
-{
-  m_x = event->x;
-  m_y = event->y;
-
-  return TRUE;
-}
-
-static gboolean
-gtk_image_view_key_press_event (GtkWidget *widget,
-                          GdkEventKey *event,
-                          gpointer user_data)
-{
-  GtkImageView *image_view = (GtkImageView *)widget;
-  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
-
-  if (event->keyval == 109)
-    {
-      double old_scale = priv->scale;
-      double new_scale = priv->scale + 0.05;
-
-
-      gtk_image_view_set_scale (image_view, new_scale);
-
-      if (priv->hadjustment || priv->vadjustment)
-        gtk_image_view_fix_point (image_view,
-                                  old_scale,
-                                  m_x,
-                                  m_y);
-      return TRUE;
-    }
-
-  return FALSE;
-}
-
-
 static gboolean
 gtk_image_view_scroll_event (GtkWidget       *widget,
                              GdkEventScroll  *event)
@@ -1275,8 +1251,6 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
   widget_class->map           = gtk_image_view_map;
   widget_class->unmap         = gtk_image_view_unmap;
   widget_class->scroll_event  = gtk_image_view_scroll_event;
-  widget_class->motion_notify_event = gtk_image_view_motion;
-  widget_class->key_press_event     = gtk_image_view_key_press_event;
   widget_class->get_preferred_width  = gtk_image_view_get_preferred_width;
   widget_class->get_preferred_height = gtk_image_view_get_preferred_height;
 
