@@ -17,7 +17,7 @@
 #include <math.h>
 
 #define DEG_TO_RAD(x) (((x) / 360.0) * (2 * M_PI))
-#define RAD_TO_DEG(x) ((x / (2.0 * M_PI) * 360.0))
+#define RAD_TO_DEG(x) (((x) / (2.0 * M_PI) * 360.0))
 
 #define TRANSITION_DURATION (150.0 * 1000.0)
 
@@ -531,6 +531,9 @@ gtk_image_view_init (GtkImageView *image_view)
   g_signal_connect (priv->zoom_gesture, "scale-changed", (GCallback)gesture_zoom_changed_cb, image_view);
   g_signal_connect (priv->zoom_gesture, "end", (GCallback)gesture_zoom_end_cb, image_view);
   g_signal_connect (priv->zoom_gesture, "cancel", (GCallback)gesture_zoom_cancel_cb, image_view);
+
+  gtk_gesture_group (priv->zoom_gesture,
+                     priv->rotate_gesture);
 
   gtk_style_context_add_class (sc, "image-view");
 }
@@ -1256,7 +1259,7 @@ gtk_image_view_scroll_event (GtkWidget       *widget,
   double old_scale = priv->scale;
   double new_scale = priv->scale - (0.1 * event->delta_y);
 
-  gtk_image_view_set_scale (image_view, new_scale);
+  gtk_image_view_set_scale_internal (image_view, new_scale);
 
   if (priv->hadjustment || priv->vadjustment)
     gtk_image_view_fix_point (image_view,
