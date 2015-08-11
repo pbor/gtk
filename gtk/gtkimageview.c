@@ -62,7 +62,6 @@ struct _GtkImageViewPrivate
   double transition_end_angle;
 };
 
-// XXX animate image size changes!
 // XXX Actually honour the scroll policies
 // XXX Check scale-factor implementation for correctness
 
@@ -207,6 +206,12 @@ gesture_angle_changed_cb (GtkGestureRotate *gesture,
   double new_angle;
   double bb_x;
   double bb_y;
+
+  if (!priv->rotate_gesture_enabled)
+    {
+      gtk_gesture_set_state ((GtkGesture *)gesture, GTK_EVENT_SEQUENCE_DENIED);
+      return;
+    }
 
   if (!priv->in_rotate)
     {
@@ -353,16 +358,13 @@ gtk_image_view_update_adjustments (GtkImageView *image_view)
 
   if (!priv->image_surface)
     {
-      /* XXX Rework this so the scrollbars just take max size? */
       if (priv->hadjustment)
-        gtk_adjustment_configure (priv->hadjustment, 0, 0, 0, 0, 0, 0);
+        gtk_adjustment_configure (priv->hadjustment, 0, 0, 1, 0, 0, 1);
 
       if (priv->vadjustment)
-        gtk_adjustment_configure (priv->vadjustment, 0, 0, 0, 0, 0, 0);
+        gtk_adjustment_configure (priv->vadjustment, 0, 0, 1, 0, 0, 1);
       return;
     }
-
-
 
 
   if (priv->fit_allocation)
@@ -469,15 +471,21 @@ gesture_zoom_cancel_cb (GtkGesture       *gesture,
 
 
 static void
-gesture_zoom_changed_cb (GtkGestureZoom *gesture,
-                         double          delta,
-                         GtkWidget      *widget)
+gesture_scale_changed_cb (GtkGestureZoom *gesture,
+                          double          delta,
+                          GtkWidget      *widget)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private ((GtkImageView *)widget);
   double bb_x;
   double bb_y;
   double new_scale;
   double old_scale = priv->scale;
+
+  if (!priv->rotate_gesture_enabled)
+    {
+      gtk_gesture_set_state ((GtkGesture *)gesture, GTK_EVENT_SEQUENCE_DENIED);
+      return;
+    }
 
   if (!priv->in_zoom)
     {
@@ -528,7 +536,7 @@ gtk_image_view_init (GtkImageView *image_view)
   g_signal_connect (priv->rotate_gesture, "cancel", (GCallback)gesture_rotate_cancel_cb, image_view);
 
   priv->zoom_gesture = gtk_gesture_zoom_new ((GtkWidget *)image_view);
-  g_signal_connect (priv->zoom_gesture, "scale-changed", (GCallback)gesture_zoom_changed_cb, image_view);
+  g_signal_connect (priv->zoom_gesture, "scale-changed", (GCallback)gesture_scale_changed_cb, image_view);
   g_signal_connect (priv->zoom_gesture, "end", (GCallback)gesture_zoom_end_cb, image_view);
   g_signal_connect (priv->zoom_gesture, "cancel", (GCallback)gesture_zoom_cancel_cb, image_view);
 
@@ -1439,8 +1447,8 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
   widget_props[PROP_ANGLE] = g_param_spec_double ("angle",
                                                   P_("angle"),
                                                   P_("angle"),
-                                                  -G_MAXDOUBLE,
-                                                  G_MAXDOUBLE,
+                                                  0.0,
+                                                  360.0,
                                                   0.0,
                                                   GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
   /**
