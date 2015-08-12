@@ -130,20 +130,43 @@ free_load_task_data (LoadTaskData *data)
   g_clear_object (&data->source);
 }
 
+
+static void
+gtk_image_view_fix_point_rotate (GtkImageView *image_view,
+                                 double        hupper_before,
+                                 double        vupper_before,
+                                 int           x_before,
+                                 int           y_before)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+
+  /*
+   * XXX
+   * We should rotate around the bounding box center of the rotate gesture,
+   * but we currently only rotate around the image center!
+   */
+
+  double x_diff = gtk_adjustment_get_value (priv->hadjustment) - hupper_before;
+  double y_diff = gtk_adjustment_get_value (priv->vadjustment) - vupper_before;
+
+  if (x_diff == 0 && y_diff == 0)
+    {
+      g_message ("No difference!");
+      return;
+    }
+
+  gtk_adjustment_set_value (priv->hadjustment,
+                            gtk_adjustment_get_value (priv->hadjustment) + x_diff);
+  gtk_adjustment_set_value (priv->vadjustment,
+                            gtk_adjustment_get_value (priv->vadjustment) + y_diff);
+}
+
 static void
 gtk_image_view_fix_point (GtkImageView *image_view,
                           double        scale_before,
                           int           x_before,
                           int           y_before)
 {
-/*                      XXX
- *                      XXX
- *                      XXX we also need to call this when the angle changes
- *                      XXX
- *                      XXX
- *                      */
-
-
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   double x_after;
   double y_after;
@@ -155,20 +178,17 @@ gtk_image_view_fix_point (GtkImageView *image_view,
   x_value = gtk_adjustment_get_value (priv->hadjustment);
   y_value = gtk_adjustment_get_value (priv->vadjustment);
 
-  x_before += gtk_adjustment_get_value (priv->hadjustment);
-  y_before += gtk_adjustment_get_value (priv->vadjustment);
+  x_before += x_value;
+  y_before += y_value;
 
 
   x_after = x_before / scale_before * priv->scale;
   y_after = y_before / scale_before * priv->scale;
 
-  double x_diff = x_after - x_before;
-  double y_diff = y_after - y_before;
-
   gtk_adjustment_set_value (priv->hadjustment,
-                            x_value + x_diff);
+                            x_value + x_after - x_before);
   gtk_adjustment_set_value (priv->vadjustment,
-                            y_value + y_diff);
+                            y_value + y_after - x_before);
 }
 
 static void
@@ -204,6 +224,8 @@ gesture_angle_changed_cb (GtkGestureRotate *gesture,
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private ((GtkImageView *)widget);
   double new_angle;
+  double hupper_before;
+  double vupper_before;
   double bb_x;
   double bb_y;
 
@@ -219,6 +241,13 @@ gesture_angle_changed_cb (GtkGestureRotate *gesture,
       priv->gesture_start_angle = priv->angle;
     }
 
+  if (priv->hadjustment && priv->vadjustment)
+    {
+      hupper_before = gtk_adjustment_get_upper (priv->hadjustment);
+      vupper_before = gtk_adjustment_get_upper (priv->vadjustment);
+    }
+
+
   new_angle = priv->gesture_start_angle + RAD_TO_DEG (delta);
 
   /* Don't notify */
@@ -232,12 +261,12 @@ gesture_angle_changed_cb (GtkGestureRotate *gesture,
 
   gtk_gesture_get_bounding_box_center ((GtkGesture *)gesture, &bb_x, &bb_y);
 
-  // XXX Fix point here.
-  /*if (priv->hadjustment || priv->vadjustment)*/
-    /*gtk_image_view_fix_point ((GtkImageView *)widget,*/
-                              /*0.0,*/
-                              /*bb_x,*/
-                              /*bb_y);*/
+  if (priv->hadjustment && priv->vadjustment)
+    gtk_image_view_fix_point_rotate ((GtkImageView *)widget,
+                                     hupper_before,
+                                     vupper_before,
+                                     bb_x,
+                                     bb_y);
 }
 
 static void
