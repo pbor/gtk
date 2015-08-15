@@ -188,7 +188,7 @@ gtk_image_view_fix_point (GtkImageView *image_view,
   gtk_adjustment_set_value (priv->hadjustment,
                             x_value + x_after - x_before);
   gtk_adjustment_set_value (priv->vadjustment,
-                            y_value + y_after - x_before);
+                            y_value + y_after - y_before);
 }
 
 static void
