@@ -138,6 +138,21 @@ load_pixbuf_button_clicked_cb ()
 
 
 void
+load_hidpi_pixbuf_button_clicked_cb ()
+{
+  GdkPixbuf *pixbuf;
+
+  /* I really hope you have this. */
+  pixbuf = gdk_pixbuf_new_from_file ("/usr/share/backgrounds/gnome/adwaita-day.jpg",
+                                     NULL);
+
+  g_assert (pixbuf != NULL);
+  gtk_image_view_set_pixbuf (GTK_IMAGE_VIEW (image_view), pixbuf, 2);
+
+  g_object_unref (G_OBJECT (pixbuf));
+}
+
+void
 load_surface_button_clicked_cb ()
 {
   GdkPixbuf *pixbuf;
