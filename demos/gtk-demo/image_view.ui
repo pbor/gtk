@@ -8,8 +8,8 @@
 
   <object class="GtkAdjustment" id="angle_adjustment">
     <property name="upper">360</property>
-    <property name="value">0</property>
-    <property name="step_increment">0.1</property>
+    <property name="value">3</property>
+    <property name="step_increment">0.10</property>
   </object>
 
 
@@ -79,7 +79,8 @@
 
         <child>
           <object class="GtkButton">
-            <property name="visible">true</property>
+            <property name="visible">false</property>
+            <property name="no_show_all">true</property>
             <property name="label" translatable="yes">Load HiDPI Pixbuf</property>
             <signal name="clicked" handler="load_hidpi_pixbuf_button_clicked_cb" object="image_view"/>
           </object>
@@ -93,7 +94,8 @@
 
         <child>
           <object class="GtkButton">
-            <property name="visible">true</property>
+            <property name="visible">false</property>
+            <property name="no_show_all">true</property>
             <property name="label" translatable="yes">Load Surface</property>
             <signal name="clicked" handler="load_surface_button_clicked_cb" />
           </object>
@@ -107,7 +109,8 @@
 
         <child>
           <object class="GtkButton">
-            <property name="visible">true</property>
+            <property name="visible">false</property>
+            <property name="no_show_all">true</property>
             <property name="label" translatable="yes">Clear</property>
             <signal name="clicked" handler="clear_button_clicked_cb" />
           </object>
@@ -190,11 +193,11 @@
         </child>
 
         <child>
-          <object class="GtkScale" id="angle_scale">
+          <object class="GtkSpinButton" id="angle_spin_button">
             <property name="visible">true</property>
-            <property name="draw_value">true</property>
+            <property name="digits">2</property>
+            <property name="numeric">true</property>
             <property name="adjustment">angle_adjustment</property>
-            <signal name="format-value" handler="angle_scale_format_value_cb" />
           </object>
           <packing>
             <property name="left_attach">0</property>
@@ -202,6 +205,22 @@
             <property name="width">2</property>
           </packing>
         </child>
+
+
+
+        <!--<child>-->
+          <!--<object class="GtkScale" id="angle_scale">-->
+            <!--<property name="visible">true</property>-->
+            <!--<property name="draw_value">true</property>-->
+            <!--<property name="adjustment">angle_adjustment</property>-->
+            <!--<signal name="format-value" handler="angle_scale_format_value_cb" />-->
+          <!--</object>-->
+          <!--<packing>-->
+            <!--<property name="left_attach">0</property>-->
+            <!--<property name="top_attach">11</property>-->
+            <!--<property name="width">2</property>-->
+          <!--</packing>-->
+        <!--</child>-->
 
         <child>
           <object class="GtkBox">
@@ -249,7 +268,8 @@
 
         <child>
           <object class="GtkLabel">
-            <property name="visible">true</property>
+            <property name="visible">false</property>
+            <property name="no_show_all">true</property>
             <property name="label" translatable="yes">Scale</property>
             <property name="margin_top">12</property>
             <property name="halign">start</property>
@@ -263,7 +283,8 @@
 
         <child>
           <object class="GtkScale" id="scale_scale">
-            <property name="visible">true</property>
+            <property name="visible">false</property>
+            <property name="no_show_all">true</property>
             <property name="draw_value">true</property>
             <property name="adjustment">scale_adjustment</property>
             <signal name="format-value" handler="scale_scale_format_value_cb" />
@@ -285,6 +306,8 @@
         <property name="visible">true</property>
         <property name="hexpand">true</property>
         <property name="vexpand">true</property>
+        <property name="width_request">400</property>
+        <property name="height_request">400</property>
       </object>
     </child>
 

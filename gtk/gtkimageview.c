@@ -20,6 +20,9 @@
 
 #define TRANSITION_DURATION (150.0 * 1000.0)
 
+double _new_x;
+double _new_y;
+
 struct _GtkImageViewPrivate
 {
   double   scale;
@@ -39,6 +42,8 @@ struct _GtkImageViewPrivate
   gboolean    in_zoom;
   double      gesture_start_scale;
 
+  /* Current anchor point, or -1/-1.
+   * Should never include the adjustment values */
   double      anchor_x;
   double      anchor_y;
 
@@ -118,6 +123,13 @@ static void adjustment_value_changed_cb (GtkAdjustment *adjustment,
                                          gpointer       user_data);
 
 static void gtk_image_view_update_adjustments (GtkImageView *image_view);
+
+static void gtk_image_view_compute_bounding_box (GtkImageView *image_view,
+                                                 int          *width,
+                                                 int          *height,
+                                                 double       *scale_out);
+
+static inline void gtk_image_view_restrict_adjustment (GtkAdjustment *adjustment);
 /* }}} */
 
 
@@ -128,36 +140,243 @@ free_load_task_data (LoadTaskData *data)
   g_clear_object (&data->source);
 }
 
+  /*
+   * XXX
+   * The code is *slightly* wrong if fit-allocation is set,
+   * but it doesn't make sense in that case anyway?
+   * XXX
+   */
+
+static void
+bounding_box_for_angle (GtkImageView *image_view,
+                        double        angle,
+                        int          *width,
+                        int          *height,
+                        double       *scale_out)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  GtkAllocation alloc;
+  double image_width;
+  double image_height;
+  int bb_width  = 0;
+  int bb_height = 0;
+  double upper_right_degrees;
+  double upper_left_degrees;
+  double r;
+  int upper_right_x, upper_right_y;
+  int upper_left_x, upper_left_y;
+  double scale;
+  static int cached_width;
+  static int cached_height;
+  static double cached_scale;
+
+  if (priv->size_valid)
+    {
+      *width = cached_width;
+      *height = cached_height;
+      if (scale_out)
+        *scale_out = cached_scale;
+      return;
+    }
+
+
+  if (!priv->image_surface)
+    {
+      *width  = 0;
+      *height = 0;
+      return;
+    }
+
+  gtk_widget_get_allocation (GTK_WIDGET (image_view), &alloc);
+
+  image_width  = cairo_image_surface_get_width (priv->image_surface);
+  image_height = cairo_image_surface_get_height (priv->image_surface);
+
+  upper_right_degrees = DEG_TO_RAD (angle) + atan (image_height / image_width);
+  upper_left_degrees  = DEG_TO_RAD (angle) + atan (image_height / -image_width);
+  r = sqrtf ((image_width / 2) * (image_width / 2) + (image_height / 2) * (image_height / 2));
+
+  upper_right_x = r * cos (upper_right_degrees);
+  upper_right_y = r * sin (upper_right_degrees);
+
+  upper_left_x = r * cos (upper_left_degrees);
+  upper_left_y = r * sin (upper_left_degrees);
+
+
+  bb_width  = MAX (fabs (upper_right_x), fabs (upper_left_x)) * 2;
+  bb_height = MAX (fabs (upper_right_y), fabs (upper_left_y)) * 2;
+
+  /* XXX The bounding box is 2px too small when fit-allocation is set */
+
+
+  if (priv->scale_set)
+    {
+      scale = priv->scale;
+    }
+  else
+    {
+      if (priv->fit_allocation)
+        {
+          double scale_x = (double)alloc.width / (double)bb_width;
+          double scale_y = (double)alloc.height / (double)bb_height;
+
+          scale = MIN (MIN (scale_x, scale_y), 1.0);
+        }
+      else
+        {
+          scale = 1.0;
+        }
+    }
+
+  cached_scale = scale;
+  if (scale_out)
+    *scale_out = scale;
+
+  if (priv->fit_allocation)
+    {
+      priv->scale = scale;
+      g_object_notify_by_pspec (G_OBJECT (image_view),
+                                widget_props[PROP_SCALE]);
+
+      *width  = cached_width  = bb_width  * scale;
+      *height = cached_height = bb_height * scale;
+    }
+  else
+    {
+      *width  = cached_width  = bb_width  * scale;
+      *height = cached_height = bb_height * scale;
+    }
+
+  priv->size_valid = TRUE;
+
+}
+
 
 static void
 gtk_image_view_fix_point_rotate (GtkImageView *image_view,
                                  double        angle_before,
-                                 int           x_before,
-                                 int           y_before)
+                                 int           anchor_x,
+                                 int           anchor_y)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   double new_angle = priv->angle;
-  double center_x;
-  double center_y;
+  int center_x;
+  int center_y;
+  double value_x;
+  double value_y;
 
-  if (!priv->hadjustment || !priv->vadjustment)
-    return;
+  /*if (!priv->hadjustment || !priv->vadjustment)*/
+    /*return;*/
 
   g_assert (priv->anchor_x != -1 && priv->anchor_y != -1);
-
-  center_x = cairo_image_surface_get_width (priv->image_surface)  / 2;
-  center_y = cairo_image_surface_get_height (priv->image_surface) / 2;
+/*
 
 
+  /*g_message ("Angle before: %f", angle_before);*/
+  /*g_message ("Angle new:    %f", priv->angle);*/
 
 
+  bounding_box_for_angle (image_view,
+                          /*angle_before,*/
+                          priv->angle,
+                          &center_x,
+                          &center_y,
+                          NULL);
 
-  /*
-   * XXX
-   * We should rotate around the bounding box center of the rotate gesture,
-   * but we currently only rotate around the image center!
-   */
+  /*gtk_image_view_compute_bounding_box (image_view,*/
+                                       /*&center_x, &center_y,*/
+                                       /*NULL);*/
 
+  center_x /= 2;
+  center_y /= 2;
+
+  if (priv->hadjustment && priv->vadjustment)
+    {
+      value_x = gtk_adjustment_get_value (priv->hadjustment);
+      value_y = gtk_adjustment_get_value (priv->vadjustment);
+    }
+  else
+    {
+      /*g_assert_not_reached ();*/
+      value_x = 0;
+      value_y = 0;
+    }
+
+  /* Distance between the gesture bounding box center and
+   * the rotation center */
+  double delta_x =  (anchor_x + value_x) - center_x;
+  double delta_y = -(anchor_y + value_y) + center_y;
+
+
+  /*double delta_x =  anchor_x - center_x;*/
+  /*double delta_y = -anchor_y + center_y;*/
+
+  g_message ("Delta: %f/%f", delta_x, delta_y);
+
+  double distance = sqrtf ((delta_x * delta_x) + (delta_y * delta_y));
+
+  double point_angle = atan2 (delta_y, delta_x);
+
+  double new_point_angle = RAD_TO_DEG (point_angle) - (new_angle - priv->gesture_start_angle);
+
+  /* Relative to center_x/center_y! */
+  double new_x = cos (DEG_TO_RAD (new_point_angle)) * distance;
+  double new_y = sin (DEG_TO_RAD (new_point_angle)) * distance;
+
+
+  _new_x = center_x + new_x;
+  _new_y = center_y - new_y;
+
+  /*_new_x = center_X + */
+
+
+  g_message ("new x: %f, y: %f", _new_x, _new_y);
+
+  static gboolean first = TRUE;
+  static double hvalue;
+  static double vvalue;
+
+  if (first)
+    {
+      hvalue = gtk_adjustment_get_value (priv->hadjustment);
+      vvalue = gtk_adjustment_get_value (priv->vadjustment);
+      first = FALSE;
+    }
+
+  double diff_x = anchor_x - _new_x;
+  g_message ("Y: %d, %f", anchor_y, _new_y);
+  /*double diff_y = y_before - _new_y;*/
+  double diff_y = _new_y - anchor_y;
+
+  g_message ("Differences: %f/%f", diff_x, diff_y);
+
+  if (priv->hadjustment && priv->vadjustment)
+    {
+      /*double x = gtk_adjustment_get_value (priv->hadjustment);*/
+      /*double y = gtk_adjustment_get_value (priv->vadjustment);*/
+      double x = hvalue;
+      double y = vvalue;
+
+      double new_x = x - diff_x;
+      double new_y = y - diff_y;
+
+      g_message ("hvalue: %f -> %f", gtk_adjustment_get_value (priv->hadjustment),
+                 new_x);
+      g_message ("vvalue: %f -> %f", gtk_adjustment_get_value (priv->vadjustment),
+                 new_y);
+      gtk_adjustment_set_value (priv->hadjustment,
+                                new_x);
+      gtk_adjustment_set_value (priv->vadjustment,
+                                new_y);
+
+
+      /*gtk_image_view_restrict_adjustment (priv->hadjustment);*/
+      /*gtk_image_view_restrict_adjustment (priv->vadjustment);*/
+      /*gtk_image_view_update_adjustments (image_view);*/
+    }
+
+
+  g_message ("-------------------------");
 }
 
 static void
@@ -173,6 +392,9 @@ gtk_image_view_fix_point (GtkImageView *image_view,
   double y_value;
 
   g_assert (!(priv->hadjustment == NULL && priv->vadjustment == NULL));
+
+  x_before += gtk_adjustment_get_value (priv->hadjustment);
+  y_before += gtk_adjustment_get_value (priv->vadjustment);
 
   x_value = gtk_adjustment_get_value (priv->hadjustment);
   y_value = gtk_adjustment_get_value (priv->vadjustment);
@@ -196,10 +418,10 @@ gesture_rotate_end_cb (GtkGesture       *gesture,
   priv->gesture_start_angle = 0.0;
   priv->in_rotate = FALSE;
 
-  gtk_image_view_set_angle (user_data, priv->angle);
+  /*gtk_image_view_set_angle (user_data, priv->angle);*/
 
-  priv->anchor_x = -1;
-  priv->anchor_y = -1;
+  /*priv->anchor_x = -1;*/
+  /*priv->anchor_y = -1;*/
 }
 
 static void
@@ -212,8 +434,8 @@ gesture_rotate_cancel_cb (GtkGesture *gesture,
   priv->in_rotate = FALSE;
   priv->gesture_start_angle = FALSE;
 
-  priv->anchor_x = -1;
-  priv->anchor_y = -1;
+  /*priv->anchor_x = -1;*/
+  /*priv->anchor_y = -1;*/
 }
 
 
@@ -243,6 +465,8 @@ gesture_angle_changed_cb (GtkGestureRotate *gesture,
 
   if (new_angle == priv->angle)
     return;
+
+  priv->size_valid = FALSE;
 
   /* Don't notify */
   old_angle = priv->angle;
@@ -562,11 +786,8 @@ gesture_begin_cb (GtkGesture       *gesture,
                                            &priv->anchor_x,
                                            &priv->anchor_y);
 
-      if (priv->hadjustment && priv->vadjustment)
-        {
-          priv->anchor_x += gtk_adjustment_get_value (priv->hadjustment);
-          priv->anchor_y += gtk_adjustment_get_value (priv->vadjustment);
-        }
+      priv->anchor_x = 50;
+      priv->anchor_y = 50;
     }
 }
 
@@ -580,6 +801,9 @@ gtk_image_view_init (GtkImageView *image_view)
 
   gtk_widget_set_can_focus (widget, TRUE);
   gtk_widget_set_has_window (widget, FALSE);
+
+  _new_x = -1;
+  _new_y = -1;
 
   priv->scale = 1.0;
   priv->angle = 0.0;
@@ -734,6 +958,7 @@ gtk_image_view_do_snapping (GtkImageView *image_view,
 
   priv->angle = new_angle;
 }
+
 static gboolean
 gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
 {
@@ -838,18 +1063,27 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
       double x = priv->anchor_x;
       double y = priv->anchor_y;
 
-      if (priv->hadjustment && priv->vadjustment)
-        {
-          x += gtk_adjustment_get_value (priv->hadjustment);
-          y += gtk_adjustment_get_value (priv->vadjustment);
-        }
-
       cairo_set_source_rgba (ct, 0, 1, 0, 1);
       cairo_rectangle (ct, x - 2, y - 2, 4, 4);
       cairo_fill (ct);
     }
 
+  if (_new_x != -1 && _new_y != -1)
+    {
+      double x = _new_x;
+      double y = _new_y;
 
+      cairo_set_source_rgba (ct, 0, 0, 1, 1);
+      cairo_rectangle (ct, x - 2, y - 2, 4, 4);
+      cairo_fill (ct);
+
+
+      g_assert (priv->anchor_x != -1 && priv->anchor_y != -1);
+
+      /*cairo_move_to (ct, priv->anchor_x, priv->anchor_y);*/
+      /*cairo_line_to (ct, _new_x, _new_y);*/
+      /*cairo_stroke (ct);*/
+    }
 
   return GDK_EVENT_PROPAGATE;
 }
@@ -1023,7 +1257,11 @@ gtk_image_view_set_angle (GtkImageView *image_view,
                           double        angle)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  double angle_before;
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
+
+
+  angle_before = priv->angle;
 
   if (angle > 360.0)
     angle -= (int)(angle / 360.0) * 360;
@@ -1042,6 +1280,27 @@ gtk_image_view_set_angle (GtkImageView *image_view,
 
   g_object_notify_by_pspec (G_OBJECT (image_view),
                             widget_props[PROP_ANGLE]);
+
+
+  /* XXX DEBUG */
+  /*if (priv->hadjustment && priv->vadjustment)*/
+    /*{*/
+      static gboolean first = TRUE;
+
+      if (first)
+        {
+          priv->gesture_start_scale = angle_before;
+          first = FALSE;
+        }
+
+      priv->anchor_x = 50 + (gtk_widget_get_allocated_width (GTK_WIDGET (image_view))) / 2 - 200;
+      priv->anchor_y = 50 + (gtk_widget_get_allocated_height (GTK_WIDGET (image_view))) / 2 - 200;
+      gtk_image_view_fix_point_rotate (image_view,
+                                       angle_before,
+                                       priv->anchor_x,
+                                       priv->anchor_y);
+    /*}*/
+
 
 
   gtk_image_view_update_adjustments (image_view);
@@ -1373,24 +1632,14 @@ gtk_image_view_scroll_event (GtkWidget       *widget,
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   double old_scale = priv->scale;
   double new_scale = priv->scale - (0.1 * event->delta_y);
-  double pointer_x = event->x;
-  double pointer_y = event->y;
 
   gtk_image_view_set_scale_internal (image_view, new_scale);
-
-
-  if (priv->hadjustment)
-    pointer_x += gtk_adjustment_get_value (priv->hadjustment);
-
-  if (priv->vadjustment)
-    pointer_y += gtk_adjustment_get_value (priv->vadjustment);
-
 
   if (priv->hadjustment || priv->vadjustment)
     gtk_image_view_fix_point (image_view,
                               old_scale,
-                              pointer_x,
-                              pointer_y);
+                              event->x,
+                              event->y);
 
   return GDK_EVENT_STOP;
 }
