@@ -31,6 +31,7 @@ typedef struct
   double scale;
 } State;
 
+
 struct _GtkImageViewPrivate
 {
   double   scale;
@@ -134,6 +135,8 @@ static inline void gtk_image_view_restrict_adjustment (GtkAdjustment *adjustment
 /* }}} */
 
 
+
+
 static void
 gtk_image_view_get_current_state (GtkImageView *image_view,
                                   State        *state)
@@ -145,6 +148,16 @@ gtk_image_view_get_current_state (GtkImageView *image_view,
   state->scale  = priv->scale;
   state->angle  = priv->angle;
 }
+
+static gchar *
+state_str (State *s)
+{
+  gchar *str = g_strdup_printf ("(Angle: %f, Scale: %f, hvalue: %f, vvalue: %f)",
+                                s->angle, s->scale, s->hvalue, s->vvalue);
+  return str;
+}
+
+
 
 
 static void
@@ -176,11 +189,11 @@ bounding_box_for_angle (GtkImageView *image_view,
   double upper_right_degrees;
   double upper_left_degrees;
   double r;
-  int upper_right_x, upper_right_y;
-  int upper_left_x, upper_left_y;
+  double upper_right_x, upper_right_y;
+  double upper_left_x, upper_left_y;
   double scale;
-  static int cached_width;
-  static int cached_height;
+  static double cached_width;
+  static double cached_height;
   static double cached_scale;
 
   /*if (priv->size_valid)*/
@@ -207,6 +220,8 @@ bounding_box_for_angle (GtkImageView *image_view,
 
   upper_right_degrees = DEG_TO_RAD (angle) + atan (image_height / image_width);
   upper_left_degrees  = DEG_TO_RAD (angle) + atan (image_height / -image_width);
+
+
   r = sqrtf ((image_width / 2) * (image_width / 2) + (image_height / 2) * (image_height / 2));
 
   upper_right_x = r * cos (upper_right_degrees);
@@ -215,11 +230,8 @@ bounding_box_for_angle (GtkImageView *image_view,
   upper_left_x = r * cos (upper_left_degrees);
   upper_left_y = r * sin (upper_left_degrees);
 
-
-  bb_width  = MAX (fabs (upper_right_x), fabs (upper_left_x)) * 2;
-  bb_height = MAX (fabs (upper_right_y), fabs (upper_left_y)) * 2;
-
-  /* XXX The bounding box is 2px too small when fit-allocation is set */
+  bb_width  = round (MAX (fabs (upper_right_x), fabs (upper_left_x)) * 2.0);
+  bb_height = round (MAX (fabs (upper_right_y), fabs (upper_left_y)) * 2.0);
 
 
   if (priv->scale_set)
@@ -241,7 +253,7 @@ bounding_box_for_angle (GtkImageView *image_view,
         }
     }
 
-  cached_scale = scale;
+  /*cached_scale = scale;*/
   if (scale_out)
     *scale_out = scale;
 
@@ -257,11 +269,12 @@ bounding_box_for_angle (GtkImageView *image_view,
   else
     {
     // XXX These 2 branches do the same?
+      g_message ("bb_width: %d, scale: %f", bb_width, scale);
       *width  = cached_width  = bb_width  * scale;
       *height = cached_height = bb_height * scale;
     }
 
-  priv->size_valid = TRUE;
+  /*priv->size_valid = TRUE;*/
 
 }
 
@@ -288,6 +301,8 @@ gtk_image_view_fix_point_rotate (GtkImageView *image_view,
   double center_x_before;
   double center_y_before;
 
+  g_message ("Old State: %s", state_str (old_state));
+
 
   bounding_box_for_angle (image_view,
                           old_state->angle,
@@ -309,16 +324,19 @@ gtk_image_view_fix_point_rotate (GtkImageView *image_view,
                           &bb_height,
                           NULL);
 
-  /*gtk_image_view_compute_bounding_box (image_view,*/
-                                       /*&center_x, &center_y,*/
-                                       /*NULL);*/
-
-  g_message ("bounding box: %d/%d", bb_width, bb_height);
+  /*g_message ("bounding box: %d/%d", bb_width, bb_height);*/
   center_x = bb_width / 2.0;
   center_y = bb_height / 2.0;
 
+
+  // XXX Now that anchor_x/anchor_y are relative to the bounding box center,
+  //     what are center_x/center_y relative to?
+
   center_x -= gtk_adjustment_get_value (priv->hadjustment);
   center_y -= gtk_adjustment_get_value (priv->vadjustment);
+
+  /*double c = center_x;*/
+  /*g_message ("%f, %f, %f, %f", a, b, c, gtk_adjustment_get_value (priv->hadjustment));*/
 
   /*
    * Facts:
@@ -340,6 +358,9 @@ gtk_image_view_fix_point_rotate (GtkImageView *image_view,
    *
    *
    */
+
+  /* XXX What if the image is rotated by 45deg and the user presses outside of it?
+   *     I.e. the anchor point would lie outside of the image? */
 
   g_message ("Anchor: %f/%f", priv->anchor_x, priv->anchor_y);
   g_message ("Center before: %f/%f", center_x_before, center_y_before);
@@ -760,6 +781,8 @@ gesture_begin_cb (GtkGesture       *gesture,
                   gpointer          user_data)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (user_data);
+
+  g_assert (0);
 
   if (priv->anchor_x == -1 && priv->anchor_y == -1)
     {
@@ -1287,8 +1310,14 @@ gtk_image_view_set_angle (GtkImageView *image_view,
           first = FALSE;
         }
 
-      priv->anchor_x = 150 + (gtk_widget_get_allocated_width (GTK_WIDGET (image_view))) / 2 - 200;
-      priv->anchor_y = 150 + (gtk_widget_get_allocated_height (GTK_WIDGET (image_view))) / 2 - 200;
+      /*priv->anchor_x = 200 + (gtk_widget_get_allocated_width (GTK_WIDGET (image_view))) / 2 - 200;*/
+      /*priv->anchor_y = 200 + (gtk_widget_get_allocated_height (GTK_WIDGET (image_view))) / 2 - 200;*/
+
+
+      priv->anchor_x = 5;
+      priv->anchor_y = 5;
+
+
       gtk_image_view_fix_point_rotate (image_view,
                                        angle_before,
                                        priv->anchor_x,
