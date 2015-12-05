@@ -192,9 +192,9 @@ bounding_box_for_angle (GtkImageView *image_view,
   double upper_right_x, upper_right_y;
   double upper_left_x, upper_left_y;
   double scale;
-  static double cached_width;
-  static double cached_height;
-  static double cached_scale;
+  /*static double cached_width;*/
+  /*static double cached_height;*/
+  /*static double cached_scale;*/
 
   /*if (priv->size_valid)*/
     /*{*/
@@ -263,20 +263,17 @@ bounding_box_for_angle (GtkImageView *image_view,
       g_object_notify_by_pspec (G_OBJECT (image_view),
                                 widget_props[PROP_SCALE]);
 
-      *width  = cached_width  = bb_width  * scale;
-      *height = cached_height = bb_height * scale;
-    }
-  else
-    {
-    // XXX These 2 branches do the same?
-      g_message ("bb_width: %d, scale: %f", bb_width, scale);
-      *width  = cached_width  = bb_width  * scale;
-      *height = cached_height = bb_height * scale;
     }
 
+  *width  = bb_width  * scale;
+  *height = bb_height * scale;
   /*priv->size_valid = TRUE;*/
 
 }
+
+
+  /* XXX What if the image is rotated by 45deg and the user presses outside of it?
+   *     I.e. the anchor point would lie outside of the image? */
 
 
 static void
@@ -287,16 +284,17 @@ gtk_image_view_fix_point_rotate (GtkImageView *image_view,
                                  State        *old_state)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
-  double new_angle = priv->angle;
+  /*double new_angle = priv->angle;*/
   int bb_width;
   int bb_height;
   double center_x;
   double center_y;
-  double value_x;
-  double value_y;
+  /*double value_x;*/
+  /*double value_y;*/
 
   g_assert (priv->anchor_x != -1 &&
             priv->anchor_y != -1);
+
 
   double center_x_before;
   double center_y_before;
@@ -310,19 +308,43 @@ gtk_image_view_fix_point_rotate (GtkImageView *image_view,
                           &bb_height,
                           NULL);
 
-  center_x_before = bb_width / 2.0;
+  center_x_before = bb_width  / 2.0;
   center_y_before = bb_height / 2.0;
 
   center_x_before -= old_state->hvalue;
   center_y_before -= old_state->vvalue;
 
+  center_x_before += anchor_x;
+  center_y_before += anchor_y;
+
 
   bounding_box_for_angle (image_view,
-                          /*angle_before,*/
                           priv->angle,
                           &bb_width,
                           &bb_height,
                           NULL);
+
+  /*
+   * XXX The anchor point changes when the angle changes...
+   */
+
+
+  /* Once we get here, we assume the adjustments are already updated. */
+  g_assert (gtk_adjustment_get_upper (priv->hadjustment) == bb_width);
+  g_assert (gtk_adjustment_get_upper (priv->vadjustment) == bb_height);
+
+
+  /*
+   * We know that the given anchor_x/anchor_y are relatieve to the
+   * old_state.
+   * So, the new task is to compute where the position of anchor_x/anchor_y
+   * are now that we changed priv->angle!
+   *
+   * After this, we need to update the current anchor point!
+   * But only because it's relative to the center...
+   */
+
+
 
   /*g_message ("bounding box: %d/%d", bb_width, bb_height);*/
   center_x = bb_width / 2.0;
@@ -334,6 +356,9 @@ gtk_image_view_fix_point_rotate (GtkImageView *image_view,
 
   center_x -= gtk_adjustment_get_value (priv->hadjustment);
   center_y -= gtk_adjustment_get_value (priv->vadjustment);
+
+  center_x += anchor_x;
+  center_y += anchor_y;
 
   /*double c = center_x;*/
   /*g_message ("%f, %f, %f, %f", a, b, c, gtk_adjustment_get_value (priv->hadjustment));*/
@@ -352,20 +377,11 @@ gtk_image_view_fix_point_rotate (GtkImageView *image_view,
    *      pixel-position AFTER the angle got changed. Then take the difference
    *      and change the value.
    *
-   *   3) The position might change and NOT depend on the anchor point at all
-   *      -- e.g. if the anchor point is at the center of the image. A change in
-   *      bounding box size will then move the image down.
-   *
-   *
    */
-
-  /* XXX What if the image is rotated by 45deg and the user presses outside of it?
-   *     I.e. the anchor point would lie outside of the image? */
 
   g_message ("Anchor: %f/%f", priv->anchor_x, priv->anchor_y);
   g_message ("Center before: %f/%f", center_x_before, center_y_before);
-  g_message ("Center: %f/%f", center_x, center_y);
-  /*g_message ("delta_x = (%d + %f) - %f", anchor_y, value_x, center_x);*/
+  g_message ("Center: %f/%f (This can be off)", center_x, center_y);
 
 
   // TODO: Fix the calculations for non-center points,
@@ -1061,8 +1077,10 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
   /* XXX Debugging, Remove later. */
   if (priv->anchor_x != -1 && priv->anchor_y != -1)
     {
-      double x = priv->anchor_x;
-      double y = priv->anchor_y;
+      double w = gtk_adjustment_get_upper (priv->hadjustment);
+      double h = gtk_adjustment_get_upper (priv->vadjustment);
+      double x = (w / 2.0) + priv->anchor_x - gtk_adjustment_get_value (priv->hadjustment);
+      double y = (h / 2.0) + priv->anchor_y - gtk_adjustment_get_value (priv->vadjustment);
 
       cairo_set_source_rgba (ct, 0, 1, 0, 1);
       cairo_rectangle (ct, x - 2, y - 2, 4, 4);
@@ -1217,6 +1235,7 @@ gtk_image_view_set_scale (GtkImageView *image_view,
 
   old_scale = priv->scale;
 
+  // XXX This should probably center relative to the bounding box, not the widget size.
   pointer_x = gtk_widget_get_allocated_width (GTK_WIDGET (image_view))  / 2;
   pointer_y = gtk_widget_get_allocated_height (GTK_WIDGET (image_view)) / 2;
 
@@ -1248,10 +1267,11 @@ gtk_image_view_get_scale (GtkImageView *image_view)
 
 /**
  * gtk_image_view_set_angle:
- * @image_view:
+ * @image_view: A #GtkImageView
  * @angle: The angle to rotate the image about, in
  *   degrees. If this is < 0 or > 360, the value wil
- *   be wrapped.
+ *   be wrapped. So e.g. setting this to 362 will result in a
+ *   angle of 2, setting it to -2 will result in 358.
  */
 void
 gtk_image_view_set_angle (GtkImageView *image_view,
@@ -1269,6 +1289,7 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   else if (angle < 0.0)
     angle = 360.0 + (int)(angle / 360.0);
 
+  // XXX 360.0 and 0.0 are the same thing, but both possible...
   g_assert (angle >= 0.0);
   g_assert (angle <= 360.0);
 
@@ -1279,6 +1300,36 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   State old_state;
   gtk_image_view_get_current_state (image_view, &old_state);
 
+
+
+
+
+      {
+        // These are in widget coordinates now.
+        double ax = gtk_widget_get_allocated_width (GTK_WIDGET (image_view)) / 2.0 + 5.0;
+        double ay = gtk_widget_get_allocated_height (GTK_WIDGET (image_view)) / 2.0 + 5.0;
+
+        // Calculate the difference between the current surface center
+        // and the current widget center + 5
+
+        // we aleady called _update_adjustments, so the 2 uppers are fine to use.
+        double cx = gtk_adjustment_get_upper (priv->hadjustment) / 2.0 -
+                    gtk_adjustment_get_value (priv->hadjustment);
+        double cy = gtk_adjustment_get_upper (priv->vadjustment) / 2.0 -
+                    gtk_adjustment_get_value (priv->vadjustment);
+
+        // cx/cy now contain the bounding box center in widget coordinates.
+
+        g_message ("cx: %f", cx);
+        g_message ("cy: %f", cy);
+        g_message ("ax: %f", ax);
+        g_message ("ay: %f", ay);
+
+        // Now store the difference between cx/cy and ax/ay in anchor_x/anchor_y
+        priv->anchor_x = ax - cx;
+        priv->anchor_y = ay - cy;
+
+      }
 
 
 
@@ -1302,21 +1353,23 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   /* XXX DEBUG */
   /*if (priv->hadjustment && priv->vadjustment)*/
     /*{*/
-      static gboolean first = TRUE;
+      /*static gboolean first = TRUE;*/
 
-      if (first)
-        {
-          priv->gesture_start_scale = angle_before;
-          first = FALSE;
-        }
+      /*if (first)*/
+        /*{*/
+          /*priv->gesture_start_scale = angle_before;*/
+          /*first = FALSE;*/
+        /*}*/
 
       /*priv->anchor_x = 200 + (gtk_widget_get_allocated_width (GTK_WIDGET (image_view))) / 2 - 200;*/
       /*priv->anchor_y = 200 + (gtk_widget_get_allocated_height (GTK_WIDGET (image_view))) / 2 - 200;*/
 
+  // XXX Later, we can just set the anchor_point to 0/0 here and calculate the
+  //     center-relative anchor point in the gesture_begin handlers
 
-      priv->anchor_x = 5;
-      priv->anchor_y = 5;
 
+
+      /*priv->anchor_x = priv->anchor_y = 5;*/
 
       gtk_image_view_fix_point_rotate (image_view,
                                        angle_before,
@@ -1802,7 +1855,7 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
    * GtkImageView:scale:
    * The scale the internal surface gets drawn with.
    *
-   * Since: 3.18
+   * Since: 3.20
    */
   widget_props[PROP_SCALE] = g_param_spec_double ("scale",
                                                   P_("Scale"),
@@ -1818,7 +1871,7 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
    * e.g. when fit-allocation is true, which will change the scale depeding on the
    * widget allocation.
    *
-   * Since: 3.18
+   * Since: 3.20
    */
   widget_props[PROP_SCALE_SET] = g_param_spec_boolean ("scale-set",
                                                        P_(""),
@@ -1831,7 +1884,7 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
    * This is in degrees and we rotate in the mathematically negative direction,
    * i.e. clock wise.
    *
-   * Since: 3.18
+   * Since: 3.20
    */
   widget_props[PROP_ANGLE] = g_param_spec_double ("angle",
                                                   P_("angle"),
@@ -1844,7 +1897,7 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
    * GtkImageView:rotate-gesture-enabled:
    * Whether or not the image can be rotated using a two-finger rotate gesture.
    *
-   * Since: 3.18
+   * Since: 3.20
    */
   widget_props[PROP_ROTATE_GESTURE_ENABLED] = g_param_spec_boolean ("rotate-gesture-enabled",
                                                                     P_("Foo"),
@@ -1855,7 +1908,7 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
    * GtkImageView:zoom-gesture-enabled:
    * Whether or not image can be scaled using a two-finger zoom gesture or not.
    *
-   * Since: 3.18
+   * Since: 3.20
    */
   widget_props[PROP_ZOOM_GESTURE_ENABLED] = g_param_spec_boolean ("zoom-gesture-enabled",
                                                                   P_("Foo"),
@@ -1869,7 +1922,7 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
    * set to the closest 90° step that is lower than the given angle.
    * Changing the angle from one 90° step to another will be transitioned
    *
-   * Since: 3.18
+   * Since: 3.20
    */
   widget_props[PROP_SNAP_ANGLE] = g_param_spec_boolean ("snap-angle",
                                                         P_("Foo"),
@@ -1883,7 +1936,7 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
    * widget allocation. The image will be scaled down to fit into the widget allocation,
    * but never scaled up.
    *
-   * Since: 3.18
+   * Since: 3.20
    */
   widget_props[PROP_FIT_ALLOCATION] = g_param_spec_boolean ("fit-allocation",
                                                             P_("Foo"),
