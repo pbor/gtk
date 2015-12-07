@@ -133,8 +133,8 @@ static void adjustment_value_changed_cb (GtkAdjustment *adjustment,
 static void gtk_image_view_update_adjustments (GtkImageView *image_view);
 
 static void gtk_image_view_compute_bounding_box (GtkImageView *image_view,
-                                                 int          *width,
-                                                 int          *height,
+                                                 double          *width,
+                                                 double          *height,
                                                  double       *scale_out);
 
 static inline void gtk_image_view_restrict_adjustment (GtkAdjustment *adjustment);
@@ -160,8 +160,8 @@ gtk_image_view_get_current_state (GtkImageView *image_view,
 static gchar *
 state_str (State *s)
 {
-  gchar *str = g_strdup_printf ("(Angle: %f, Scale: %f, hvalue: %f, vvalue: %f)",
-                                s->angle, s->scale, s->hvalue, s->vvalue);
+  gchar *str = g_strdup_printf ("(Angle: %f, Scale: %f, hvalue: %f, vvalue: %f, hupper: %f, vupper: %f)",
+                                s->angle, s->scale, s->hvalue, s->vvalue, s->hupper, s->vupper);
   return str;
 }
 
@@ -334,23 +334,6 @@ gtk_image_view_fix_point_rotate (GtkImageView *image_view,
   g_message ("hupper_diff: %f", hupper_diff);
   g_message ("vupper_diff: %f", vupper_diff);
 
-
-  /*
-   * Facts:
-   *
-   *   1) anchor_x and anchor_y are relative to the widget origin.
-   *      They have to be.
-   *
-   *      XXX Do they? If the bounding box size changes, the only point
-   *          that will stay fixed is the center of it!
-   *
-   *   2) For every time we get in here, we need to get the pixel-position
-   *      of the anchor point BEFORE the angle got changed, and its
-   *      pixel-position AFTER the angle got changed. Then take the difference
-   *      and change the value.
-   *
-   */
-
   gtk_adjustment_set_value (priv->hadjustment,
                             gtk_adjustment_get_value (priv->hadjustment) + hupper_diff / 2.0);
   gtk_adjustment_set_value (priv->vadjustment,
@@ -488,24 +471,24 @@ gesture_angle_changed_cb (GtkGestureRotate *gesture,
 
 static void
 gtk_image_view_compute_bounding_box (GtkImageView *image_view,
-                                     int          *width,
-                                     int          *height,
+                                     double          *width,
+                                     double          *height,
                                      double       *scale_out)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   GtkAllocation alloc;
   double image_width;
   double image_height;
-  int bb_width  = 0;
-  int bb_height = 0;
+  double bb_width  = 0;
+  double bb_height = 0;
   double upper_right_degrees;
   double upper_left_degrees;
   double r;
   double upper_right_x, upper_right_y;
   double upper_left_x, upper_left_y;
   double scale;
-  static int cached_width;
-  static int cached_height;
+  static double cached_width;
+  static double cached_height;
   static double cached_scale;
 
   if (priv->size_valid)
@@ -629,7 +612,7 @@ gtk_image_view_update_adjustments (GtkImageView *image_view)
     }
   else
     {
-      int width, height;
+      double width, height;
       gtk_image_view_compute_bounding_box (image_view,
                                            &width,
                                            &height,
@@ -968,8 +951,8 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
   int widget_height = gtk_widget_get_allocated_height (widget);
   int draw_x;
   int draw_y;
-  int draw_width;
-  int draw_height;
+  double draw_width;
+  double draw_height;
   double scale = 0.0;
 
 
@@ -1336,11 +1319,11 @@ gtk_image_view_set_angle (GtkImageView *image_view,
     priv->angle = angle;
 
 
-  /*priv->size_valid = FALSE;*/
+  priv->size_valid = FALSE;
 
 
 
-  /*gtk_image_view_update_adjustments (image_view);*/
+  gtk_image_view_update_adjustments (image_view);
 
 
   g_object_notify_by_pspec (G_OBJECT (image_view),
@@ -1631,7 +1614,7 @@ gtk_image_view_get_preferred_height (GtkWidget *widget,
   GtkImageView *image_view  = GTK_IMAGE_VIEW (widget);
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
-  int width, height;
+  double width, height;
   gtk_image_view_compute_bounding_box (image_view,
                                        &width,
                                        &height,
@@ -1656,7 +1639,7 @@ gtk_image_view_get_preferred_width (GtkWidget *widget,
 {
   GtkImageView *image_view  = GTK_IMAGE_VIEW (widget);
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
-  int width, height;
+  double width, height;
   gtk_image_view_compute_bounding_box (image_view,
                                        &width,
                                        &height,
