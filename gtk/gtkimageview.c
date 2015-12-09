@@ -1046,25 +1046,18 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
       double h = gtk_adjustment_get_upper (priv->vadjustment);
       double hv = gtk_adjustment_get_value (priv->hadjustment);
       double vv = gtk_adjustment_get_value (priv->vadjustment);
-      double x = (w / 2.0) + priv->anchor_x - hv;
-      double y = (h / 2.0) + priv->anchor_y - vv;
-      int i;
+      /*double x = (w / 2.0) + priv->anchor_x - hv;*/
+      /*double y = (h / 2.0) + priv->anchor_y - vv;*/
 
-      /*cairo_move_to (ct, 0, 0);*/
-      /*cairo_set_source_rgba (ct, 0, 1, 0, 1);*/
-      /*cairo_rectangle (ct, x - 2, y - 2, 4, 4);*/
-      /*cairo_fill (ct);*/
+      double x = gtk_widget_get_allocated_width (widget) / 2.0 + 5;
+      double y = gtk_widget_get_allocated_height (widget) / 2.0 + 5;
 
 
-      for (i = 0; i < 360; i ++)
-        {
-          if (p_x[i] == 0) continue;
-          /*g_message ("Drawing %d: %d, %d", i, p_x[i], p_y[i]);*/
 
-          /*cairo_set_source_rgba (ct, 0, 1, 0, 1);*/
-          /*cairo_rectangle (ct, w/2.0 + p_x[i] - 2 - hv, h/2.0 + p_y[i] - 2 - vv, 4, 4);*/
-          /*cairo_fill (ct);*/
-        }
+
+      cairo_set_source_rgba (ct, 0, 1, 0, 1);
+      cairo_rectangle (ct, x - 2, y - 2, 4, 4);
+      cairo_fill (ct);
 
 
     }
