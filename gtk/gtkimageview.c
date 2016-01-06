@@ -175,6 +175,25 @@ free_load_task_data (LoadTaskData *data)
 
 
 static void
+to_rotate_coords (GtkImageView *image_view,
+                  double  in_x,  double  in_y,
+                  double *out_x, double *out_y)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+
+
+  double cx = gtk_adjustment_get_upper (priv->hadjustment) / 2.0 -
+              gtk_adjustment_get_value (priv->hadjustment);
+  double cy = gtk_adjustment_get_upper (priv->vadjustment) / 2.0 -
+              gtk_adjustment_get_value (priv->vadjustment);
+
+  *out_x = in_x - cx;
+  *out_y = in_y - cy;
+
+}
+
+
+static void
 gtk_image_view_fix_anchor_rotate (GtkImageView *image_view,
                                   double        anchor_x,
                                   double        anchor_y,
@@ -198,50 +217,69 @@ gtk_image_view_fix_anchor_rotate (GtkImageView *image_view,
    * updated scale
    */
   {
+    g_assert (anchor_x >= 0);
+    g_assert (anchor_y >= 0);
+    g_assert (anchor_x < gtk_widget_get_allocated_width (GTK_WIDGET (image_view)));
+    g_assert (anchor_y < gtk_widget_get_allocated_height (GTK_WIDGET (image_view)));
+
     double hvalue = gtk_adjustment_get_value (priv->hadjustment);
     double vvalue = gtk_adjustment_get_value (priv->vadjustment);
 
-    /*double anchor_x = priv->anchor_x*/
+    double px = anchor_x + hvalue;
+    double py = anchor_y + vvalue;
 
-    /*double x_diff = (old_state->hvalue / old_state->scale * priv->scale) - priv->anchor_x;*/
-    /*double y_diff = (old_state->vvalue / old_state->scale * priv->scale) - priv->anchor_y;*/
-    double x_diff = (priv->anchor_x * priv->scale) - (priv->anchor_x * old_state->scale);
-    double y_diff = (priv->anchor_y * priv->scale) - (priv->anchor_y * old_state->scale);
-
-    g_message ("x_diff: %f", x_diff);
-    g_message ("y_diff: %f", y_diff);
+    double px_after = (px / old_state->scale) * priv->scale;
+    double py_after = (py / old_state->scale) * priv->scale;
 
     gtk_adjustment_set_value (priv->hadjustment,
-                              hvalue - x_diff);
+                              hvalue + px_after - px);
     gtk_adjustment_set_value (priv->vadjustment,
-                              vvalue - y_diff);
+                              vvalue + py_after - py);
   }
 
 
+  double rotate_anchor_x = 0;
+  double rotate_anchor_y = 0;
+
+
+  to_rotate_coords (image_view, anchor_x, anchor_y,
+                    &rotate_anchor_x, &rotate_anchor_y);
+
+  /*rotate_anchor_x = (rotate_anchor_x / old_state->scale) * priv->scale;*/
+  /*rotate_anchor_y = (rotate_anchor_y / old_state->scale) * priv->scale;*/
+
+  g_message ("Rotate anchor coords: %f/%f", rotate_anchor_x, rotate_anchor_y);
+
   /* 1) Calculate the angle of our anchor point. */
-  double anchor_angle = atan2 (priv->anchor_y, priv->anchor_x);
+  double anchor_angle = atan2 (rotate_anchor_x, rotate_anchor_y);
 
 
-  double anchor_length = sqrt ((priv->anchor_x * priv->anchor_x) +
-                               (priv->anchor_y * priv->anchor_y));
+  double anchor_length = sqrt ((rotate_anchor_x * rotate_anchor_x) +
+                               (rotate_anchor_y * rotate_anchor_y));
   g_message ("Anchor angle: %f", RAD_TO_DEG (anchor_angle));
   g_message ("Anchor length: %f", anchor_length);
 
   /* 2) Calculate the position of our anchor point with increased angle */
   double angle_diff = priv->angle - old_state->angle;
-  double scale_diff = priv->scale - old_state->scale;
   anchor_angle += DEG_TO_RAD (angle_diff);
 
   g_message ("anchor angle after: %f", RAD_TO_DEG (anchor_angle));
 
 
   g_message ("Angle got increased by %f", angle_diff);
+  double scale_diff = priv->scale - old_state->scale;
   g_message ("Scale got increased by %f", scale_diff);
   double new_anchor_x = cos (anchor_angle) * anchor_length;
   double new_anchor_y = sin (anchor_angle) * anchor_length;
 
   g_message ("New anchor: %f, %f", new_anchor_x, new_anchor_y);
 
+
+  // XXX This upper diff is caused both by the scale and by the angle.
+  //     Both have been updated and thus changed the upper. Here,
+  //     we only need to use the impact the angle had.
+  //
+  // XXX Only use the the impact the scale had earlier in this function!
 
   double hupper_diff = gtk_adjustment_get_upper (priv->hadjustment) - old_state->hupper;
   double vupper_diff = gtk_adjustment_get_upper (priv->vadjustment) - old_state->vupper;
@@ -257,10 +295,10 @@ gtk_image_view_fix_anchor_rotate (GtkImageView *image_view,
 
 
 
-  double diff_x = priv->anchor_x - new_anchor_x;
-  double diff_y = priv->anchor_y - new_anchor_y;
+  /*double diff_x = rotate_anchor_x- new_anchor_x;*/
+  /*double diff_y = rotate_anchor_y- new_anchor_y;*/
 
-  g_message ("Diff: %f/%f", diff_x, diff_y);
+  /*g_message ("Diff: %f/%f", diff_x, diff_y);*/
 
   /*gtk_adjustment_set_value (priv->hadjustment,*/
                             /*gtk_adjustment_get_value (priv->hadjustment) - diff_x);*/
@@ -388,12 +426,6 @@ gesture_angle_changed_cb (GtkGestureRotate *gesture,
         priv->anchor_x = ax - cx;
         priv->anchor_y = ay - cy;
       }
-
-
-
-
-
-
 
 
   new_angle = priv->gesture_start_angle + RAD_TO_DEG (delta);
@@ -1170,12 +1202,11 @@ gtk_image_view_get_scale (GtkImageView *image_view)
   return priv->scale;
 }
 
-
 /**
  * gtk_image_view_set_angle:
  * @image_view: A #GtkImageView
  * @angle: The angle to rotate the image about, in
- *   degrees. If this is < 0 or > 360, the value wil
+ *   degrees. If this is < 0 or > 360, the value will
  *   be wrapped. So e.g. setting this to 362 will result in a
  *   angle of 2, setting it to -2 will result in 358.
  *   Both 0 and 360 are possible.
@@ -1209,17 +1240,21 @@ gtk_image_view_set_angle (GtkImageView *image_view,
 
 
       {
+        // Fake anchor point on the bottom right of the widget center
         // These are in widget coordinates now.
         double ax = gtk_widget_get_allocated_width (GTK_WIDGET (image_view)) / 2.0 + 5.0;
         double ay = gtk_widget_get_allocated_height (GTK_WIDGET (image_view)) / 2.0 + 5.0;
 
+        priv->anchor_x = ax;
+        priv->anchor_y = ay;
+
         // Calculate the difference between the current surface center
         // and the current widget center + 5
 
-        double cx = gtk_adjustment_get_upper (priv->hadjustment) / 2.0 -
-                    gtk_adjustment_get_value (priv->hadjustment);
-        double cy = gtk_adjustment_get_upper (priv->vadjustment) / 2.0 -
-                    gtk_adjustment_get_value (priv->vadjustment);
+        /*double cx = gtk_adjustment_get_upper (priv->hadjustment) / 2.0 -*/
+                    /*gtk_adjustment_get_value (priv->hadjustment);*/
+        /*double cy = gtk_adjustment_get_upper (priv->vadjustment) / 2.0 -*/
+                    /*gtk_adjustment_get_value (priv->vadjustment);*/
 
         // cx/cy now contain the bounding box center in widget coordinates.
 
@@ -1228,12 +1263,11 @@ gtk_image_view_set_angle (GtkImageView *image_view,
         /*g_message ("ax: %f", ax);*/
         /*g_message ("ay: %f", ay);*/
 
+        // XXX Enable this again if it doesn't work out.
         // Now store the difference between cx/cy and ax/ay in anchor_x/anchor_y
-        priv->anchor_x = ax - cx;
-        priv->anchor_y = ay - cy;
+        /*priv->anchor_x = ax - cx;*/
+        /*priv->anchor_y = ay - cy;*/
       }
-
-
 
   /*if (priv->snap_angle)*/
     /*gtk_image_view_do_snapping (image_view, angle);*/
@@ -1244,7 +1278,7 @@ gtk_image_view_set_angle (GtkImageView *image_view,
                                        priv->scale + .1);
     g_message ("New scale: %f", priv->scale);
 
-    priv->angle = angle;
+    /*priv->angle = angle;*/
 
 
   priv->size_valid = FALSE;
