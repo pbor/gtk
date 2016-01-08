@@ -200,9 +200,15 @@ gtk_image_view_fix_anchor_rotate (GtkImageView *image_view,
                                   State        *old_state)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  double hupper_delta = gtk_adjustment_get_upper (priv->hadjustment) - old_state->hupper;
+  double vupper_delta = gtk_adjustment_get_upper (priv->vadjustment) - old_state->vupper;
 
   g_assert (priv->anchor_x != -1 &&
             priv->anchor_y != -1);
+
+  g_assert (priv->hadjustment);
+  g_assert (priv->vadjustment);
+  g_assert (priv->size_valid);
 
 
   g_message ("Old State: %s", state_str (old_state));
@@ -210,8 +216,31 @@ gtk_image_view_fix_anchor_rotate (GtkImageView *image_view,
   g_message ("New scale: %f", priv->scale);
 
   g_message ("Anchor: %f/%f", priv->anchor_x, priv->anchor_y);
+  g_message ("hupper_delta: %f", hupper_delta);
+  g_message ("vupper_delta: %f", vupper_delta);
 
 
+
+
+  double hupper = gtk_adjustment_get_upper (priv->hadjustment);
+  double hdiff_scale = (old_state->hupper / old_state->scale) * priv->scale;
+
+  double hd = hdiff_scale - old_state->hupper;
+
+  g_message ("hupper diff: %f", (hupper - old_state->hupper));
+  g_message ("scale_diff: %f", hd);
+  g_message ("angle_diff: %f", hupper_delta - hd);
+
+
+  /* Amount of upper change caused by scale */
+  double hupper_delta_scale = ((old_state->hupper / old_state->scale) * priv->scale)
+                              - old_state->hupper;
+  double vupper_delta_scale = ((old_state->vupper / old_state->scale) * priv->scale)
+                              - old_state->vupper;
+
+  /* Amount of upper change caused by angle */
+  double hupper_delta_angle = hupper_delta - hupper_delta_scale;
+  double vupper_delta_angle = vupper_delta - vupper_delta_scale;
 
   /* As a first step, fix the anchor point with regard to the
    * updated scale
@@ -237,6 +266,7 @@ gtk_image_view_fix_anchor_rotate (GtkImageView *image_view,
                               vvalue + py_after - py);
   }
 
+  /*return;*/
 
   double rotate_anchor_x = 0;
   double rotate_anchor_y = 0;
@@ -281,15 +311,10 @@ gtk_image_view_fix_anchor_rotate (GtkImageView *image_view,
   //
   // XXX Only use the the impact the scale had earlier in this function!
 
-  double hupper_diff = gtk_adjustment_get_upper (priv->hadjustment) - old_state->hupper;
-  double vupper_diff = gtk_adjustment_get_upper (priv->vadjustment) - old_state->vupper;
-  g_message ("hupper_diff: %f", hupper_diff);
-  g_message ("vupper_diff: %f", vupper_diff);
-
   gtk_adjustment_set_value (priv->hadjustment,
-                            gtk_adjustment_get_value (priv->hadjustment) + hupper_diff / 2.0);
+                            gtk_adjustment_get_value (priv->hadjustment) + hupper_delta_angle / 2.0);
   gtk_adjustment_set_value (priv->vadjustment,
-                            gtk_adjustment_get_value (priv->vadjustment) + vupper_diff / 2.0);
+                            gtk_adjustment_get_value (priv->vadjustment) + vupper_delta_angle / 2.0);
 
 
 
