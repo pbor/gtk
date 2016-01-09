@@ -1981,6 +1981,24 @@ scrollbar {
 
   button { border: none; }
 
+  &.vertical {
+    button.up {
+      -gtk-icon-source: -gtk-icontheme('pan-down-symbolic');
+    }
+    button.down {
+      -gtk-icon-source: -gtk-icontheme('pan-up-symbolic');
+    }
+  }
+
+  &.horizontal {
+    button.up {
+      -gtk-icon-source: -gtk-icontheme('pan-right-symbolic');
+    }
+    button.down {
+      -gtk-icon-source: -gtk-icontheme('pan-left-symbolic');
+    }
+  }
+
   &.overlay-indicator {
     &:not(.dragging):not(.hovering) { // Overlay scrolling indicator
       opacity: 0.4;
