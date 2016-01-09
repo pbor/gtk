@@ -222,8 +222,6 @@ do_image_view (GtkWidget *do_widget)
   GtkAdjustment *angle_adjustment = GTK_ADJUSTMENT (gtk_builder_get_object (builder, "angle_adjustment"));
 
 
-  /*g_signal_connect (G_OBJECT (image_view), "prepare-image", G_CALLBACK (prepare_image_cb), NULL);*/
-
   gtk_window_set_title (GTK_WINDOW (window), "blue: current, green: anchor");
 
   g_object_bind_property (scale_adjustment, "value", image_view, "scale",
