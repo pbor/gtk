@@ -194,17 +194,15 @@ to_rotate_coords (GtkImageView *image_view,
 
 
 static void
-gtk_image_view_fix_anchor_rotate (GtkImageView *image_view,
-                                  double        anchor_x,
-                                  double        anchor_y,
-                                  State        *old_state)
+gtk_image_view_fix_anchor (GtkImageView *image_view,
+                           double        anchor_x,
+                           double        anchor_y,
+                           State        *old_state)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   double hupper_delta = gtk_adjustment_get_upper (priv->hadjustment) - old_state->hupper;
   double vupper_delta = gtk_adjustment_get_upper (priv->vadjustment) - old_state->vupper;
 
-  /*g_assert (priv->anchor_x != -1 &&*/
-            /*priv->anchor_y != -1);*/
 
   g_assert (priv->hadjustment);
   g_assert (priv->vadjustment);
@@ -408,7 +406,7 @@ gesture_angle_changed_cb (GtkGestureRotate *gesture,
   gtk_image_view_update_adjustments (image_view);
 
   if (priv->hadjustment && priv->vadjustment)
-    gtk_image_view_fix_anchor_rotate (image_view,
+    gtk_image_view_fix_anchor (image_view,
                                       priv->anchor_x,
                                       priv->anchor_y,
                                       &old_state);
@@ -693,7 +691,7 @@ gesture_scale_changed_cb (GtkGestureZoom *gesture,
 
   if (priv->hadjustment || priv->vadjustment)
     {
-      gtk_image_view_fix_anchor_rotate (image_view,
+      gtk_image_view_fix_anchor (image_view,
                                         priv->anchor_x,
                                         priv->anchor_y,
                                         &state);
@@ -1005,8 +1003,8 @@ gtk_image_view_set_hadjustment (GtkImageView  *image_view,
 
   if (hadjustment)
     {
-      g_signal_connect ((GObject *)hadjustment, "value-changed",
-                        (GCallback) adjustment_value_changed_cb, image_view);
+      g_signal_connect (G_OBJECT (hadjustment), "value-changed",
+                        G_CALLBACK (adjustment_value_changed_cb), image_view);
       priv->hadjustment = g_object_ref_sink (hadjustment);
     }
   else
@@ -1014,14 +1012,14 @@ gtk_image_view_set_hadjustment (GtkImageView  *image_view,
       priv->hadjustment = hadjustment;
     }
 
-  g_object_notify ((GObject *)image_view, "hadjustment");
+  g_object_notify (G_OBJECT (image_view), "hadjustment");
 
   gtk_image_view_update_adjustments (image_view);
 
   if (priv->fit_allocation)
-    gtk_widget_queue_draw ((GtkWidget *)image_view);
+    gtk_widget_queue_draw (GTK_WIDGET (image_view));
   else
-    gtk_widget_queue_resize ((GtkWidget *)image_view);
+    gtk_widget_queue_resize (GTK_WIDGET (image_view));
 
 }
 
@@ -1120,7 +1118,7 @@ gtk_image_view_set_scale (GtkImageView *image_view,
 
   if (priv->hadjustment != NULL && priv->vadjustment != NULL)
     {
-      gtk_image_view_fix_anchor_rotate (image_view,
+      gtk_image_view_fix_anchor (image_view,
                                         pointer_x,
                                         pointer_y,
                                         &state);
@@ -1185,7 +1183,7 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   //
   // TODO: Would we have to document this behavior? Or make it configurable?
 
-  gtk_image_view_fix_anchor_rotate (image_view,
+  gtk_image_view_fix_anchor (image_view,
                                     priv->anchor_x,
                                     priv->anchor_y,
                                     &state);
@@ -1524,7 +1522,7 @@ gtk_image_view_scroll_event (GtkWidget       *widget,
 
   if (priv->hadjustment || priv->vadjustment)
     {
-      gtk_image_view_fix_anchor_rotate (image_view,
+      gtk_image_view_fix_anchor (image_view,
                                         event->x,
                                         event->y,
                                         &state);
