@@ -243,6 +243,9 @@ gtk_image_view_fix_anchor_rotate (GtkImageView *image_view,
   double hupper_delta_angle = hupper_delta - hupper_delta_scale;
   double vupper_delta_angle = vupper_delta - vupper_delta_scale;
 
+
+
+
   /* As a first step, fix the anchor point with regard to the
    * updated scale
    */
@@ -269,6 +272,17 @@ gtk_image_view_fix_anchor_rotate (GtkImageView *image_view,
     gtk_adjustment_set_value (priv->vadjustment,
                               vvalue + py_after - py);
   }
+
+
+
+  gtk_adjustment_set_value (priv->hadjustment,
+                            gtk_adjustment_get_value (priv->hadjustment) + hupper_delta_angle / 2.0);
+
+  gtk_adjustment_set_value (priv->vadjustment,
+                            gtk_adjustment_get_value (priv->vadjustment) + vupper_delta_angle / 2.0);
+
+
+
 
   double rotate_anchor_x = 0;
   double rotate_anchor_y = 0;
@@ -1272,7 +1286,7 @@ gtk_image_view_set_angle (GtkImageView *image_view,
     g_message ("New scale: %f", priv->scale);
 
   priv->angle = angle;
-  g_message ("New angle: %f", angle);
+  /*g_message ("New angle: %f", angle);*/
 
 
   priv->size_valid = FALSE;
