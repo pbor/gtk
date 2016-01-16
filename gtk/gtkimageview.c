@@ -321,10 +321,6 @@ gtk_image_view_fix_anchor_rotate (GtkImageView *image_view,
   g_message ("New anchor: %f, %f", new_anchor_x, new_anchor_y);
 
 
-  /* XXX */
-  /* The angle fixing now needs to take the scale into account! */
-
-
   double diff_x = rotate_anchor_x - new_anchor_x;
   double diff_y = rotate_anchor_y - new_anchor_y;
 
@@ -1154,6 +1150,8 @@ gtk_image_view_set_angle (GtkImageView *image_view,
                           double        angle)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  State state;
+
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
 
 
@@ -1170,30 +1168,7 @@ gtk_image_view_set_angle (GtkImageView *image_view,
 
 
 
-  State old_state;
-  gtk_image_view_get_current_state (image_view, &old_state);
-
-
-
-
-
-      /*{*/
-        // Fake anchor point on the bottom right of the widget center
-        // These are in widget coordinates now.
-        /*double ax = gtk_widget_get_allocated_width (GTK_WIDGET (image_view)) / 2.0 + 5.0;*/
-        /*double ay = gtk_widget_get_allocated_height (GTK_WIDGET (image_view)) / 2.0 + 5.0;*/
-
-        /*priv->anchor_x = ax;*/
-        /*priv->anchor_y = ay;*/
-      /*}*/
-  /*if (priv->snap_angle)*/
-    /*gtk_image_view_do_snapping (image_view, angle);*/
-  /*else*/
-
-
-  /*gtk_image_view_set_scale_internal (image_view,*/
-                                       /*priv->scale + .1);*/
-  /*g_message ("New scale: %f", priv->scale);*/
+  gtk_image_view_get_current_state (image_view, &state);
 
   priv->angle = angle;
   priv->size_valid = FALSE;
@@ -1213,7 +1188,7 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   gtk_image_view_fix_anchor_rotate (image_view,
                                     priv->anchor_x,
                                     priv->anchor_y,
-                                    &old_state);
+                                    &state);
 
   if (priv->fit_allocation)
     gtk_widget_queue_draw (GTK_WIDGET (image_view));
