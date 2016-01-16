@@ -185,10 +185,6 @@ to_rotate_coords (GtkImageView *image_view,
   double cx = state->hupper / 2.0 - state->hvalue;
   double cy = state->vupper / 2.0 - state->vvalue;
 
-  /* XXX
-   * This function seems to be wrong, should report 5/5 at first angle
-   * change in the demo, but returns -2/-2. */
-
   *out_x = in_x - cx;
   *out_y = in_y - cy;
 }
@@ -382,10 +378,8 @@ gesture_rotate_end_cb (GtkGesture       *gesture,
   priv->gesture_start_angle = 0.0;
   priv->in_rotate = FALSE;
 
-  /*gtk_image_view_set_angle (user_data, priv->angle);*/
-
-  /*priv->anchor_x = -1;*/
-  /*priv->anchor_y = -1;*/
+  priv->anchor_x = -1;
+  priv->anchor_y = -1;
 }
 
 static void
@@ -398,8 +392,8 @@ gesture_rotate_cancel_cb (GtkGesture       *gesture,
   priv->in_rotate = FALSE;
   priv->gesture_start_angle = 0.0;
 
-  /*priv->anchor_x = -1;*/
-  /*priv->anchor_y = -1;*/
+  priv->anchor_x = -1;
+  priv->anchor_y = -1;
 }
 
 
@@ -430,35 +424,6 @@ gesture_angle_changed_cb (GtkGestureRotate *gesture,
     State old_state;
     gtk_image_view_get_current_state (GTK_IMAGE_VIEW (widget), &old_state);
 
-
-
-
-      {
-        // These are in widget coordinates now.
-        double ax = gtk_widget_get_allocated_width (widget) / 2.0 + 5.0;
-        double ay = gtk_widget_get_allocated_height (widget) / 2.0 + 5.0;
-
-        // Calculate the difference between the current surface center
-        // and the current widget center + 5
-
-        double cx = gtk_adjustment_get_upper (priv->hadjustment) / 2.0 -
-                    gtk_adjustment_get_value (priv->hadjustment);
-        double cy = gtk_adjustment_get_upper (priv->vadjustment) / 2.0 -
-                    gtk_adjustment_get_value (priv->vadjustment);
-
-        // cx/cy now contain the bounding box center in widget coordinates.
-
-        g_message ("cx: %f", cx);
-        g_message ("cy: %f", cy);
-        g_message ("ax: %f", ax);
-        g_message ("ay: %f", ay);
-
-        // Now store the difference between cx/cy and ax/ay in anchor_x/anchor_y
-        priv->anchor_x = ax - cx;
-        priv->anchor_y = ay - cy;
-      }
-
-
   new_angle = priv->gesture_start_angle + RAD_TO_DEG (delta);
 
   if (new_angle == priv->angle)
@@ -467,13 +432,8 @@ gesture_angle_changed_cb (GtkGestureRotate *gesture,
   priv->size_valid = FALSE;
 
   /* Don't notify */
-  /*old_angle = priv->angle;*/
   priv->angle = new_angle;
   gtk_image_view_update_adjustments (GTK_IMAGE_VIEW (widget));
-
-  g_assert (priv->hadjustment);
-  g_assert (priv->vadjustment);
-
 
   gtk_image_view_fix_anchor_rotate (GTK_IMAGE_VIEW (widget),
                                     priv->anchor_x,
@@ -747,13 +707,11 @@ gesture_scale_changed_cb (GtkGestureZoom *gesture,
   double old_scale = priv->scale;
 
 
-  g_error (":/");
-
-  /*if (!priv->rotate_gesture_enabled)*/
-    /*{*/
-      /*gtk_gesture_set_state (GTK_GESTURE (gesture), GTK_EVENT_SEQUENCE_DENIED);*/
+  if (!priv->rotate_gesture_enabled)
+    {
+      gtk_gesture_set_state (GTK_GESTURE (gesture), GTK_EVENT_SEQUENCE_DENIED);
       return;
-    /*}*/
+    }
 
   if (!priv->in_zoom)
     {
@@ -784,22 +742,14 @@ gesture_begin_cb (GtkGesture       *gesture,
                   GdkEventSequence *sequence,
                   gpointer          user_data)
 {
-  GtkImageView *image_view = GTK_IMAGE_VIEW (user_data);
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (user_data);
-  /*GtkWidget *widget = GTK_WIDGET (user_data);*/
 
-
-
-
-  /*if (priv->anchor_x == -1 && priv->anchor_y == -1)*/
-    /*{*/
-      /*gtk_gesture_get_bounding_box_center (gesture,*/
-                                           /*&priv->anchor_x,*/
-                                           /*&priv->anchor_y);*/
-
-      /*priv->anchor_x = 50;*/
-      /*priv->anchor_y = 50;*/
-    /*}*/
+  if (priv->anchor_x == -1 && priv->anchor_y == -1)
+    {
+      gtk_gesture_get_bounding_box_center (gesture,
+                                           &priv->anchor_x,
+                                           &priv->anchor_y);
+    }
 }
 
 
@@ -830,14 +780,14 @@ gtk_image_view_init (GtkImageView *image_view)
   g_signal_connect (priv->rotate_gesture, "end", (GCallback)gesture_rotate_end_cb, image_view);
   g_signal_connect (priv->rotate_gesture, "cancel", (GCallback)gesture_rotate_cancel_cb, image_view);
 
-  /*priv->zoom_gesture = gtk_gesture_zoom_new (widget);*/
-  /*g_signal_connect (priv->zoom_gesture, "scale-changed", (GCallback)gesture_scale_changed_cb, image_view);*/
-  /*g_signal_connect (priv->zoom_gesture, "begin", (GCallback)gesture_begin_cb, image_view);*/
-  /*g_signal_connect (priv->zoom_gesture, "end", (GCallback)gesture_zoom_end_cb, image_view);*/
-  /*g_signal_connect (priv->zoom_gesture, "cancel", (GCallback)gesture_zoom_cancel_cb, image_view);*/
+  priv->zoom_gesture = gtk_gesture_zoom_new (widget);
+  g_signal_connect (priv->zoom_gesture, "scale-changed", (GCallback)gesture_scale_changed_cb, image_view);
+  g_signal_connect (priv->zoom_gesture, "begin", (GCallback)gesture_begin_cb, image_view);
+  g_signal_connect (priv->zoom_gesture, "end", (GCallback)gesture_zoom_end_cb, image_view);
+  g_signal_connect (priv->zoom_gesture, "cancel", (GCallback)gesture_zoom_cancel_cb, image_view);
 
-  /*gtk_gesture_group (priv->zoom_gesture,*/
-                     /*priv->rotate_gesture);*/
+  gtk_gesture_group (priv->zoom_gesture,
+                     priv->rotate_gesture);
 }
 
 
