@@ -31,6 +31,9 @@ typedef struct
 } State;
 
 
+// XXX Add gtk_image_reset_view that transitions back to scale = 1 and angle = 0.
+
+
 struct _GtkImageViewPrivate
 {
   double   scale;
@@ -207,6 +210,11 @@ gtk_image_view_fix_anchor (GtkImageView *image_view,
   g_assert (priv->hadjustment);
   g_assert (priv->vadjustment);
   g_assert (priv->size_valid);
+  g_assert (anchor_x >= 0);
+  g_assert (anchor_y >= 0);
+  g_assert (anchor_x < gtk_widget_get_allocated_width (GTK_WIDGET (image_view)));
+  g_assert (anchor_y < gtk_widget_get_allocated_height (GTK_WIDGET (image_view)));
+
 
 
   g_message ("Old State: %s", state_str (old_state));
@@ -247,11 +255,6 @@ gtk_image_view_fix_anchor (GtkImageView *image_view,
    * updated scale
    */
   {
-    g_assert (anchor_x >= 0);
-    g_assert (anchor_y >= 0);
-    g_assert (anchor_x < gtk_widget_get_allocated_width (GTK_WIDGET (image_view)));
-    g_assert (anchor_y < gtk_widget_get_allocated_height (GTK_WIDGET (image_view)));
-
     double hvalue = gtk_adjustment_get_value (priv->hadjustment);
     double vvalue = gtk_adjustment_get_value (priv->vadjustment);
 
@@ -261,9 +264,6 @@ gtk_image_view_fix_anchor (GtkImageView *image_view,
     double px_after = (px / old_state->scale) * priv->scale;
     double py_after = (py / old_state->scale) * priv->scale;
 
-    g_message ("Setting hvalue from %f to %f",
-               gtk_adjustment_get_value (priv->hadjustment),
-               hvalue + px_after - px);
     gtk_adjustment_set_value (priv->hadjustment,
                               hvalue + px_after - px);
     gtk_adjustment_set_value (priv->vadjustment,
@@ -284,13 +284,9 @@ gtk_image_view_fix_anchor (GtkImageView *image_view,
   double rotate_anchor_x = 0;
   double rotate_anchor_y = 0;
 
-
   to_rotate_coords (image_view, old_state,
                     anchor_x, anchor_y,
                     &rotate_anchor_x, &rotate_anchor_y);
-
-  /*rotate_anchor_x = (rotate_anchor_x / old_state->scale) * priv->scale;*/
-  /*rotate_anchor_y = (rotate_anchor_y / old_state->scale) * priv->scale;*/
 
   g_message ("Rotate anchor coords: %f/%f", rotate_anchor_x, rotate_anchor_y);
 
@@ -389,20 +385,17 @@ gesture_angle_changed_cb (GtkGestureRotate *gesture,
     }
 
 
-
-
-
   new_angle = priv->gesture_start_angle + RAD_TO_DEG (delta);
 
   if (new_angle == priv->angle)
     return;
 
-  priv->size_valid = FALSE;
 
   gtk_image_view_get_current_state (image_view, &old_state);
 
   /* Don't notify */
   priv->angle = new_angle;
+  priv->size_valid = FALSE;
   gtk_image_view_update_adjustments (image_view);
 
   if (priv->hadjustment && priv->vadjustment)
@@ -601,6 +594,7 @@ gtk_image_view_set_scale_internal (GtkImageView *image_view,
   scale = MAX (0, scale);
 
   priv->scale = scale;
+  priv->size_valid = FALSE;
   g_object_notify_by_pspec (G_OBJECT (image_view),
                             widget_props[PROP_SCALE]);
 
@@ -619,7 +613,6 @@ gtk_image_view_set_scale_internal (GtkImageView *image_view,
                                 widget_props[PROP_FIT_ALLOCATION]);
     }
 
-  priv->size_valid = FALSE;
 
   gtk_image_view_update_adjustments (image_view);
 
@@ -885,6 +878,8 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
   int widget_height = gtk_widget_get_allocated_height (widget);
   int draw_x;
   int draw_y;
+  int image_width;
+  int image_height;
   double draw_width;
   double draw_height;
   double scale = 0.0;
@@ -917,9 +912,8 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
   if (draw_width == 0 || draw_height == 0)
     return GDK_EVENT_PROPAGATE;
 
-
-  int image_width  = cairo_image_surface_get_width (priv->image_surface)  * scale;
-  int image_height = cairo_image_surface_get_height (priv->image_surface) * scale;
+  image_width  = cairo_image_surface_get_width (priv->image_surface)  * scale;
+  image_height = cairo_image_surface_get_height (priv->image_surface) * scale;
 
 
   if (priv->hadjustment && priv->vadjustment)
@@ -1276,9 +1270,9 @@ gtk_image_view_set_fit_allocation (GtkImageView *image_view,
   priv->fit_allocation = fit_allocation;
   g_object_notify_by_pspec (G_OBJECT (image_view),
                             widget_props[PROP_FIT_ALLOCATION]);
-  priv->size_valid = FALSE;
 
   priv->scale_set = FALSE;
+  priv->size_valid = FALSE;
   g_object_notify_by_pspec (G_OBJECT (image_view),
                             widget_props[PROP_SCALE_SET]);
 
