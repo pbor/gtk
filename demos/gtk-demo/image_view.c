@@ -127,7 +127,7 @@ load_pixbuf_button_clicked_cb ()
   GdkPixbuf *pixbuf;
 
   /* I really hope you have this. */
-  pixbuf = gdk_pixbuf_new_from_file ("/home/baedert/imageview.png",
+  pixbuf = gdk_pixbuf_new_from_file ("/home/baedert/imageview2.png",
                                      NULL);
 
   g_assert (pixbuf != NULL);
