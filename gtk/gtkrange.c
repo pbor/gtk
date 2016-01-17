@@ -2315,7 +2315,6 @@ coord_to_value (GtkRange *range,
   gint    trough_length;
   gint    trough_start;
   gint    slider_length;
-  gint    trough_border;
 
   if (priv->orientation == GTK_ORIENTATION_VERTICAL)
     {
@@ -2329,8 +2328,6 @@ coord_to_value (GtkRange *range,
       trough_start  = priv->trough.x;
       slider_length = priv->slider.width;
     }
-
-  gtk_range_get_props (range, NULL, NULL, &trough_border, NULL);
 
   if (trough_length == slider_length)
     frac = 1.0;
