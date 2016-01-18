@@ -222,7 +222,7 @@ do_image_view (GtkWidget *do_widget)
   GtkAdjustment *angle_adjustment = GTK_ADJUSTMENT (gtk_builder_get_object (builder, "angle_adjustment"));
 
 
-  gtk_window_set_title (GTK_WINDOW (window), "blue: current, green: anchor");
+  /*gtk_window_set_title (GTK_WINDOW (window), "blue: current, green: anchor");*/
 
   g_object_bind_property (scale_adjustment, "value", image_view, "scale",
                           G_BINDING_BIDIRECTIONAL);
@@ -237,7 +237,7 @@ do_image_view (GtkWidget *do_widget)
   gtk_container_add (GTK_CONTAINER (window), box);
   gtk_builder_connect_signals (builder, NULL);
 
-  /*gtk_window_resize (GTK_WINDOW (window), 800, 600);*/
+  gtk_window_resize (GTK_WINDOW (window), 800, 600);
   gtk_widget_show_all (window);
   return window;
 }

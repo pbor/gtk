@@ -9,8 +9,8 @@
   <object class="GtkAdjustment" id="angle_adjustment">
     <property name="upper">360</property>
     <property name="value">3</property>
-    <!--<property name="step_increment">0.1</property>-->
-    <property name="step_increment">1</property>
+    <property name="step_increment">0.1</property>
+    <!--<property name="step_increment">1</property>-->
     <!--<property name="step_increment">45</property>-->
   </object>
 
@@ -193,20 +193,34 @@
         </child>
 
 
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">true</property>
+            <property name="label" translatable="yes">Scale</property>
+            <property name="halign">start</property>
+            <property name="xalign">0.0</property>
+          </object>
+          <packing>
+            <property name="left_attach">0</property>
+            <property name="top_attach">12</property>
+            <property name="width">2</property>
+          </packing>
+        </child>
 
-        <!--<child>-->
-          <!--<object class="GtkScale" id="angle_scale">-->
-            <!--<property name="visible">true</property>-->
-            <!--<property name="draw_value">true</property>-->
-            <!--<property name="adjustment">angle_adjustment</property>-->
-            <!--<signal name="format-value" handler="angle_scale_format_value_cb" />-->
-          <!--</object>-->
-          <!--<packing>-->
-            <!--<property name="left_attach">0</property>-->
-            <!--<property name="top_attach">11</property>-->
-            <!--<property name="width">2</property>-->
-          <!--</packing>-->
-        <!--</child>-->
+        <child>
+          <object class="GtkSpinButton" id="scale_spin_button">
+            <property name="visible">true</property>
+            <property name="digits">2</property>
+            <property name="numeric">true</property>
+            <property name="adjustment">scale_adjustment</property>
+          </object>
+          <packing>
+            <property name="left_attach">0</property>
+            <property name="top_attach">13</property>
+            <property name="width">2</property>
+          </packing>
+        </child>
+
 
         <child>
           <object class="GtkBox">
@@ -246,42 +260,10 @@
           </object>
           <packing>
             <property name="left_attach">0</property>
-            <property name="top_attach">12</property>
-            <property name="width">2</property>
-          </packing>
-        </child>
-
-
-        <child>
-          <object class="GtkLabel">
-            <property name="visible">false</property>
-            <property name="no_show_all">true</property>
-            <property name="label" translatable="yes">Scale</property>
-            <property name="margin_top">12</property>
-            <property name="halign">start</property>
-          </object>
-          <packing>
-            <property name="left_attach">0</property>
-            <property name="top_attach">13</property>
-            <property name="width">2</property>
-          </packing>
-        </child>
-
-        <child>
-          <object class="GtkScale" id="scale_scale">
-            <property name="visible">false</property>
-            <property name="no_show_all">true</property>
-            <property name="draw_value">true</property>
-            <property name="adjustment">scale_adjustment</property>
-            <signal name="format-value" handler="scale_scale_format_value_cb" />
-          </object>
-          <packing>
-            <property name="left_attach">0</property>
             <property name="top_attach">14</property>
             <property name="width">2</property>
           </packing>
         </child>
-
 
       </object>
 
