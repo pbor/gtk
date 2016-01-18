@@ -214,9 +214,8 @@ do_image_view (GtkWidget *do_widget)
   GtkWidget *box      = GTK_WIDGET (gtk_builder_get_object (builder, "box"));
   GtkWidget *snap_angle_button = GTK_WIDGET (gtk_builder_get_object (builder, "snap_angle_check_button"));
   GtkWidget *fit_allocation_button = GTK_WIDGET (gtk_builder_get_object (builder, "fit_allocation_check_button"));
-  GtkWidget *header_bar = gtk_header_bar_new ();
-  gtk_header_bar_set_show_close_button (GTK_HEADER_BAR (header_bar), TRUE);
-  gtk_window_set_titlebar (GTK_WINDOW (window), header_bar);
+  GtkWidget *rotate_gesture_button = GTK_WIDGET (gtk_builder_get_object (builder, "rotate_gesture_check_button"));
+  GtkWidget *zoom_gesture_button = GTK_WIDGET (gtk_builder_get_object (builder, "zoom_gesture_check_button"));
 
   GtkAdjustment *scale_adjustment = GTK_ADJUSTMENT (gtk_builder_get_object (builder, "scale_adjustment"));
   GtkAdjustment *angle_adjustment = GTK_ADJUSTMENT (gtk_builder_get_object (builder, "angle_adjustment"));
@@ -232,6 +231,15 @@ do_image_view (GtkWidget *do_widget)
                           G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
   g_object_bind_property (image_view, "fit-allocation", fit_allocation_button, "active",
                           G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
+
+  g_object_bind_property (image_view, "rotate-gesture-enabled",
+                          rotate_gesture_button, "active",
+                          G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
+
+  g_object_bind_property (image_view, "zoom-gesture-enabled",
+                          zoom_gesture_button, "active",
+                          G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
+
 
 
   gtk_container_add (GTK_CONTAINER (window), box);
