@@ -1311,9 +1311,12 @@ gtk_image_view_set_rotate_gesture_enabled (GtkImageView *image_view,
 
   rotate_gesture_enabled = !!rotate_gesture_enabled;
 
-  priv->rotate_gesture_enabled = rotate_gesture_enabled;
-  g_object_notify_by_pspec (G_OBJECT (image_view),
-                            widget_props[PROP_ROTATE_GESTURE_ENABLED]);
+  if (priv->rotate_gesture_enabled != rotate_gesture_enabled)
+    {
+      priv->rotate_gesture_enabled = rotate_gesture_enabled;
+      g_object_notify_by_pspec (G_OBJECT (image_view),
+                                widget_props[PROP_ROTATE_GESTURE_ENABLED]);
+    }
 }
 
 gboolean
@@ -1336,9 +1339,12 @@ gtk_image_view_set_zoom_gesture_enabled (GtkImageView *image_view,
 
   zoom_gesture_enabled = !!zoom_gesture_enabled;
 
-  priv->zoom_gesture_enabled = zoom_gesture_enabled;
-  g_object_notify_by_pspec (G_OBJECT (image_view),
-                            widget_props[PROP_ZOOM_GESTURE_ENABLED]);
+  if (zoom_gesture_enabled != priv->zoom_gesture_enabled)
+    {
+      priv->zoom_gesture_enabled = zoom_gesture_enabled;
+      g_object_notify_by_pspec (G_OBJECT (image_view),
+                                widget_props[PROP_ZOOM_GESTURE_ENABLED]);
+    }
 }
 
 gboolean
@@ -1545,8 +1551,6 @@ gtk_image_view_set_property (GObject      *object,
       case PROP_SCALE:
         gtk_image_view_set_scale (image_view, g_value_get_double (value));
         break;
-      /*case PROP_SCALE_SET:*/
-        /*break;*/
       case PROP_ANGLE:
         gtk_image_view_set_angle (image_view, g_value_get_double (value));
         break;
@@ -1555,6 +1559,12 @@ gtk_image_view_set_property (GObject      *object,
         break;
       case PROP_FIT_ALLOCATION:
         gtk_image_view_set_fit_allocation (image_view, g_value_get_boolean (value));
+        break;
+      case PROP_ROTATE_GESTURE_ENABLED:
+        gtk_image_view_set_rotate_gesture_enabled (image_view, g_value_get_boolean (value));
+        break;
+      case PROP_ZOOM_GESTURE_ENABLED:
+        gtk_image_view_set_zoom_gesture_enabled (image_view, g_value_get_boolean (value));
         break;
       case PROP_HADJUSTMENT:
         gtk_image_view_set_hadjustment (image_view, g_value_get_object (value));
@@ -1587,9 +1597,9 @@ gtk_image_view_get_property (GObject    *object,
       case PROP_SCALE:
         g_value_set_double (value, priv->scale);
         break;
-      /*case PROP_SCALE_SET:*/
-        /*g_value_set_boolean (value, priv->scale_set);*/
-        /*break;*/
+      case PROP_SCALE_SET:
+        g_value_set_boolean (value, priv->scale_set);
+        break;
       case PROP_ANGLE:
         g_value_set_double (value, priv->angle);
         break;
@@ -1598,6 +1608,12 @@ gtk_image_view_get_property (GObject    *object,
         break;
       case PROP_FIT_ALLOCATION:
         g_value_set_boolean (value, priv->fit_allocation);
+        break;
+      case PROP_ROTATE_GESTURE_ENABLED:
+        g_value_set_boolean (value, priv->rotate_gesture_enabled);
+        break;
+      case PROP_ZOOM_GESTURE_ENABLED:
+        g_value_set_boolean (value, priv->zoom_gesture_enabled);
         break;
       case PROP_HADJUSTMENT:
         g_value_set_object (value, priv->hadjustment);
@@ -1685,7 +1701,7 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
                                                        P_(""),
                                                        P_("fooar"),
                                                        FALSE,
-                                                       GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
+                                                       GTK_PARAM_READABLE|G_PARAM_EXPLICIT_NOTIFY);
   /**
    * GtkImageView:angle:
    * The angle the surface gets rotated about.
@@ -2037,19 +2053,6 @@ gtk_image_view_set_pixbuf (GtkImageView    *image_view,
   gtk_image_view_update_surface (image_view, pixbuf, scale_factor);
 
   gtk_image_view_update_adjustments (image_view);
-
-
-  /* XXX @debug */
-  double value = gtk_adjustment_get_upper (priv->hadjustment) / 2.0 -
-                 gtk_adjustment_get_page_size (priv->hadjustment) / 2.0;
-
-  gtk_adjustment_set_value (priv->hadjustment, value);
-
-  value = gtk_adjustment_get_upper (priv->vadjustment) / 2.0 -
-          gtk_adjustment_get_page_size (priv->vadjustment) / 2.0;
-
-  gtk_adjustment_set_value (priv->vadjustment, value);
-
 }
 
 /**
