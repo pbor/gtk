@@ -397,9 +397,9 @@ gesture_angle_changed_cb (GtkGestureRotate *gesture,
 
   if (priv->hadjustment && priv->vadjustment)
     gtk_image_view_fix_anchor (image_view,
-                                      priv->anchor_x,
-                                      priv->anchor_y,
-                                      &old_state);
+                               priv->anchor_x,
+                               priv->anchor_y,
+                               &old_state);
 
   // XXX Even if fit_allocation is not set, we still don't need to query a resize
   //     if we are in a scrolledwindow, right?
@@ -623,7 +623,9 @@ gesture_zoom_end_cb (GtkGesture       *gesture,
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (user_data);
 
-  gtk_image_view_set_scale (user_data, priv->scale);
+  /* XXX Is this correct? */
+  if (priv->zoom_gesture_enabled)
+    gtk_image_view_set_scale (user_data, priv->scale);
 
   priv->gesture_start_scale = 0.0;
   priv->in_zoom = FALSE;
@@ -676,9 +678,9 @@ gesture_scale_changed_cb (GtkGestureZoom *gesture,
   if (priv->hadjustment != NULL && priv->vadjustment != NULL)
     {
       gtk_image_view_fix_anchor (image_view,
-                                        priv->anchor_x,
-                                        priv->anchor_y,
-                                        &state);
+                                 priv->anchor_x,
+                                 priv->anchor_y,
+                                 &state);
     }
 }
 
@@ -1135,9 +1137,9 @@ gtk_image_view_set_scale (GtkImageView *image_view,
   if (priv->hadjustment != NULL && priv->vadjustment != NULL)
     {
       gtk_image_view_fix_anchor (image_view,
-                                        pointer_x,
-                                        pointer_y,
-                                        &state);
+                                 pointer_x,
+                                 pointer_y,
+                                 &state);
     }
 }
 
@@ -1509,11 +1511,11 @@ gtk_image_view_get_preferred_width (GtkWidget *widget,
   GtkImageView *image_view  = GTK_IMAGE_VIEW (widget);
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   double width, height;
+
   gtk_image_view_compute_bounding_box (image_view,
                                        &width,
                                        &height,
                                        NULL);
-
   if (priv->fit_allocation)
     {
       *minimal = 0;
@@ -1524,7 +1526,6 @@ gtk_image_view_get_preferred_width (GtkWidget *widget,
       *minimal = width;
       *natural = width;
     }
-
 }
 
 
@@ -1544,9 +1545,9 @@ gtk_image_view_scroll_event (GtkWidget       *widget,
   if (priv->hadjustment != NULL && priv->vadjustment != NULL)
     {
       gtk_image_view_fix_anchor (image_view,
-                                        event->x,
-                                        event->y,
-                                        &state);
+                                 event->x,
+                                 event->y,
+                                 &state);
     }
 
   return GDK_EVENT_STOP;
