@@ -148,12 +148,15 @@ gtk_image_view_get_current_state (GtkImageView *image_view,
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
-  state->hvalue = gtk_adjustment_get_value (priv->hadjustment);
-  state->vvalue = gtk_adjustment_get_value (priv->vadjustment);
-  state->scale  = priv->scale;
+  if (priv->hadjustment != NULL && priv->vadjustment != NULL)
+    {
+      state->hvalue = gtk_adjustment_get_value (priv->hadjustment);
+      state->vvalue = gtk_adjustment_get_value (priv->vadjustment);
+      state->hupper = gtk_adjustment_get_upper (priv->hadjustment);
+      state->vupper = gtk_adjustment_get_upper (priv->vadjustment);
+    }
   state->angle  = priv->angle;
-  state->hupper = gtk_adjustment_get_upper (priv->hadjustment);
-  state->vupper = gtk_adjustment_get_upper (priv->vadjustment);
+  state->scale  = priv->scale;
 }
 
 static gchar *
@@ -682,7 +685,7 @@ gesture_scale_changed_cb (GtkGestureZoom *gesture,
 
   gtk_image_view_set_scale_internal (image_view, new_scale);
 
-  if (priv->hadjustment || priv->vadjustment)
+  if (priv->hadjustment != NULL && priv->vadjustment != NULL)
     {
       gtk_image_view_fix_anchor (image_view,
                                         priv->anchor_x,
@@ -1157,9 +1160,6 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   g_assert (angle <= 360.0);
 
 
-
-
-
   gtk_image_view_get_current_state (image_view, &state);
 
   priv->angle = angle;
@@ -1177,10 +1177,12 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   //
   // TODO: Would we have to document this behavior? Or make it configurable?
 
-  gtk_image_view_fix_anchor (image_view,
-                                    priv->anchor_x,
-                                    priv->anchor_y,
-                                    &state);
+
+  if (priv->hadjustment != NULL && priv->vadjustment != NULL)
+    gtk_image_view_fix_anchor (image_view,
+                                priv->anchor_x,
+                                priv->anchor_y,
+                                &state);
 
   if (priv->fit_allocation)
     gtk_widget_queue_draw (GTK_WIDGET (image_view));
@@ -1514,7 +1516,7 @@ gtk_image_view_scroll_event (GtkWidget       *widget,
 
   gtk_image_view_set_scale_internal (image_view, new_scale);
 
-  if (priv->hadjustment || priv->vadjustment)
+  if (priv->hadjustment != NULL && priv->vadjustment != NULL)
     {
       gtk_image_view_fix_anchor (image_view,
                                         event->x,
@@ -1891,11 +1893,11 @@ gtk_image_view_load_image_contents (GTask        *task,
   GError *error = NULL;
   GFileInputStream *in_stream;
 
-  g_free (task_data);
   in_stream = g_file_read (file, cancellable, &error);
 
   if (error)
     {
+      g_free (data);
       g_task_return_error (task, error);
       return;
     }
@@ -1909,6 +1911,8 @@ gtk_image_view_load_image_contents (GTask        *task,
 
   if (error)
     g_task_return_error (task, error);
+
+  g_slice_free (LoadTaskData, data);
 }
 
 static void
