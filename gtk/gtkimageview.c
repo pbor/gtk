@@ -1622,6 +1622,8 @@ gtk_image_view_finalize (GObject *object)
 
   gtk_image_view_stop_animation (image_view);
 
+  g_clear_object (&priv->source_animation);
+
   g_clear_object (&priv->rotate_gesture);
   g_clear_object (&priv->zoom_gesture);
 
@@ -1630,7 +1632,6 @@ gtk_image_view_finalize (GObject *object)
 
   if (priv->image_surface)
     cairo_surface_destroy (priv->image_surface);
-
 
   G_OBJECT_CLASS (gtk_image_view_parent_class)->finalize (object);
 }
@@ -1890,6 +1891,7 @@ gtk_image_view_load_image_contents (GTask        *task,
   GError *error = NULL;
   GFileInputStream *in_stream;
 
+  g_free (task_data);
   in_stream = g_file_read (file, cancellable, &error);
 
   if (error)
