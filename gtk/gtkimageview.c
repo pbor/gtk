@@ -135,6 +135,7 @@ static void gtk_image_view_compute_bounding_box (GtkImageView *image_view,
                                                  double          *width,
                                                  double          *height,
                                                  double       *scale_out);
+static void gtk_image_view_ensure_gestures (GtkImageView *image_view);
 
 static inline void gtk_image_view_restrict_adjustment (GtkAdjustment *adjustment);
 /* }}} */
@@ -175,9 +176,6 @@ free_load_task_data (LoadTaskData *data)
 {
   g_clear_object (&data->source);
 }
-
-  /* XXX What if the image is rotated by 45deg and the user presses outside of it?
-   *     I.e. the anchor point would lie outside of the image? */
 
 
 static void
@@ -729,7 +727,49 @@ gesture_zoom_begin_cb (GtkGesture       *gesture,
 }
 
 
+static void
+gtk_image_view_ensure_gestures (GtkImageView *image_view)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
+  if (priv->zoom_gesture_enabled && priv->zoom_gesture == NULL)
+    {
+      priv->zoom_gesture = gtk_gesture_zoom_new (GTK_WIDGET (image_view));
+      g_signal_connect (priv->zoom_gesture, "scale-changed",
+                        (GCallback)gesture_scale_changed_cb, image_view);
+      g_signal_connect (priv->zoom_gesture, "begin",
+                        (GCallback)gesture_zoom_begin_cb, image_view);
+      g_signal_connect (priv->zoom_gesture, "end",
+                        (GCallback)gesture_zoom_end_cb, image_view);
+      g_signal_connect (priv->zoom_gesture, "cancel",
+                        (GCallback)gesture_zoom_cancel_cb, image_view);
+    }
+  else if (!priv->zoom_gesture_enabled && priv->zoom_gesture != NULL)
+    {
+      g_clear_object (&priv->zoom_gesture);
+    }
+
+  if (priv->rotate_gesture_enabled && priv->rotate_gesture == NULL)
+    {
+      priv->rotate_gesture = gtk_gesture_rotate_new (GTK_WIDGET (image_view));
+      /*gtk_event_controller_set_propagation_phase (GTK_EVENT_CONTROLLER (priv->rotate_gesture),*/
+                                                  /*GTK_PHASE_CAPTURE);*/
+      g_signal_connect (priv->rotate_gesture, "angle-changed", (GCallback)gesture_angle_changed_cb, image_view);
+      g_signal_connect (priv->rotate_gesture, "begin", (GCallback)gesture_rotate_begin_cb, image_view);
+      g_signal_connect (priv->rotate_gesture, "end", (GCallback)gesture_rotate_end_cb, image_view);
+      g_signal_connect (priv->rotate_gesture, "cancel", (GCallback)gesture_rotate_cancel_cb, image_view);
+
+
+    }
+  else if (!priv->rotate_gesture_enabled && priv->rotate_gesture != NULL)
+    {
+      g_clear_object (&priv->rotate_gesture);
+    }
+
+  if (priv->zoom_gesture && priv->rotate_gesture)
+    gtk_gesture_group (priv->zoom_gesture,
+                       priv->rotate_gesture);
+}
 
 static void
 gtk_image_view_init (GtkImageView *image_view)
@@ -750,22 +790,8 @@ gtk_image_view_init (GtkImageView *image_view)
   priv->anchor_y = -1;
   priv->rotate_gesture_enabled = TRUE;
   priv->zoom_gesture_enabled = TRUE;
-  priv->rotate_gesture = gtk_gesture_rotate_new (widget);
-  gtk_event_controller_set_propagation_phase (GTK_EVENT_CONTROLLER (priv->rotate_gesture),
-                                              GTK_PHASE_CAPTURE);
-  g_signal_connect (priv->rotate_gesture, "angle-changed", (GCallback)gesture_angle_changed_cb, image_view);
-  g_signal_connect (priv->rotate_gesture, "begin", (GCallback)gesture_rotate_begin_cb, image_view);
-  g_signal_connect (priv->rotate_gesture, "end", (GCallback)gesture_rotate_end_cb, image_view);
-  g_signal_connect (priv->rotate_gesture, "cancel", (GCallback)gesture_rotate_cancel_cb, image_view);
 
-  priv->zoom_gesture = gtk_gesture_zoom_new (widget);
-  g_signal_connect (priv->zoom_gesture, "scale-changed", (GCallback)gesture_scale_changed_cb, image_view);
-  g_signal_connect (priv->zoom_gesture, "begin", (GCallback)gesture_zoom_begin_cb, image_view);
-  g_signal_connect (priv->zoom_gesture, "end", (GCallback)gesture_zoom_end_cb, image_view);
-  g_signal_connect (priv->zoom_gesture, "cancel", (GCallback)gesture_zoom_cancel_cb, image_view);
-
-  gtk_gesture_group (priv->zoom_gesture,
-                     priv->rotate_gesture);
+  gtk_image_view_ensure_gestures (image_view);
 }
 
 
@@ -1335,6 +1361,7 @@ gtk_image_view_set_rotate_gesture_enabled (GtkImageView *image_view,
   if (priv->rotate_gesture_enabled != rotate_gesture_enabled)
     {
       priv->rotate_gesture_enabled = rotate_gesture_enabled;
+      gtk_image_view_ensure_gestures (image_view);
       g_object_notify_by_pspec (G_OBJECT (image_view),
                                 widget_props[PROP_ROTATE_GESTURE_ENABLED]);
     }
@@ -1363,6 +1390,7 @@ gtk_image_view_set_zoom_gesture_enabled (GtkImageView *image_view,
   if (zoom_gesture_enabled != priv->zoom_gesture_enabled)
     {
       priv->zoom_gesture_enabled = zoom_gesture_enabled;
+      gtk_image_view_ensure_gestures (image_view);
       g_object_notify_by_pspec (G_OBJECT (image_view),
                                 widget_props[PROP_ZOOM_GESTURE_ENABLED]);
     }
