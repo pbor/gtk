@@ -247,5 +247,8 @@ do_image_view (GtkWidget *do_widget)
 
   gtk_window_resize (GTK_WINDOW (window), 800, 600);
   gtk_widget_show_all (window);
+
+  g_object_unref (builder);
+
   return window;
 }
