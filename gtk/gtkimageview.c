@@ -1447,6 +1447,21 @@ gtk_image_view_realize (GtkWidget *widget)
 }
 
 static void
+gtk_image_view_unrealize (GtkWidget *widget)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (GTK_IMAGE_VIEW (widget));
+
+  if (priv->event_window)
+    {
+      gtk_widget_unregister_window (widget, priv->event_window);
+      gdk_window_destroy (priv->event_window);
+      priv->event_window = NULL;
+    }
+
+  GTK_WIDGET_CLASS (gtk_image_view_parent_class)->unrealize (widget);
+}
+
+static void
 gtk_image_view_size_allocate (GtkWidget     *widget,
                               GtkAllocation *allocation)
 {
@@ -1716,6 +1731,7 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
 
   widget_class->draw          = gtk_image_view_draw;
   widget_class->realize       = gtk_image_view_realize;
+  widget_class->unrealize     = gtk_image_view_unrealize;
   widget_class->size_allocate = gtk_image_view_size_allocate;
   widget_class->map           = gtk_image_view_map;
   widget_class->unmap         = gtk_image_view_unmap;
@@ -1919,6 +1935,7 @@ gtk_image_view_replace_animation (GtkImageView       *image_view,
       gtk_image_view_update_surface (image_view,
                                      gdk_pixbuf_animation_get_static_image (animation),
                                      scale_factor);
+      g_object_unref (animation);
     }
 
 }
@@ -1942,7 +1959,7 @@ gtk_image_view_load_image_from_stream (GtkImageView *image_view,
 
   g_object_unref (input_stream);
   if (!error)
-    gtk_image_view_replace_animation (image_view, result,scale_factor);
+    gtk_image_view_replace_animation (image_view, result, scale_factor);
 }
 
 static void
