@@ -2014,6 +2014,8 @@ gtk_image_view_load_from_input_stream (GTask        *task,
 
   if (error)
     g_task_return_error (task, error);
+
+  g_slice_free (LoadTaskData, data);
 }
 
 
