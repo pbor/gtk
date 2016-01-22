@@ -25,6 +25,26 @@ file_set_cb (GtkFileChooserButton *widget,
                                        NULL);
 }
 
+
+static void
+image_loaded_cb (GObject      *source_object,
+                 GAsyncResult *result,
+                 gpointer      user_data)
+{
+  GtkImageView *image_view = GTK_IMAGE_VIEW (source_object);
+  GError *error = NULL;
+
+  gtk_image_view_load_from_file_finish (image_view,
+                                        result,
+                                        &error);
+
+  if (error)
+    {
+      g_message ("Error: %s", error->message);
+      return;
+    }
+}
+
 void
 load_button_cb ()
 {
@@ -34,7 +54,7 @@ load_button_cb ()
                                        file,
                                        1,
                                        NULL,
-                                       generic_cb,
+                                       image_loaded_cb,
                                        NULL);
 }
 
