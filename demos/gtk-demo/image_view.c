@@ -118,10 +118,12 @@ scrolled_check_button_active_cb (GObject *source)
                                       GTK_POLICY_ALWAYS,
                                       GTK_POLICY_ALWAYS);
       gtk_scrolled_window_set_overlay_scrolling (GTK_SCROLLED_WINDOW (scroller), FALSE);
-      gtk_widget_show (scroller);
+      g_object_ref (image_view);
       gtk_container_remove (GTK_CONTAINER (parent), image_view);
       gtk_container_add (GTK_CONTAINER (scroller), image_view);
       gtk_container_add (GTK_CONTAINER (parent), scroller);
+      gtk_widget_show (scroller);
+      g_object_unref (image_view);
     }
 }
 
