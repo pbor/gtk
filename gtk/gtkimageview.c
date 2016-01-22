@@ -1135,8 +1135,7 @@ gtk_image_view_set_vscroll_policy (GtkImageView        *image_view,
  * @scale: The new scale value
  *
  * Sets the value of the #scale property. This will cause the
- * #scale-set property to be set to #TRUE as well. If the given
- * value of @scale is below zero, 0 will be set instead.
+ * #scale-set property to be set to #TRUE as well
  *
  * If #fit-allocation is #TRUE, it will be set to #FALSE, and @image_view
  * will be resized to the image's current size, taking the new scale into
@@ -2093,7 +2092,7 @@ gtk_image_view_load_from_stream_finish (GtkImageView  *image_view,
 /*
  * gtk_image_view_set_pixbuf:
  * @image_view: A #GtkImageView instance
- * @pixbuf: A #GdkPixbuf instance
+ * @pixbuf: (transfer none): A #GdkPixbuf instance
  * @scale_factor: The scale factor of the pixbuf. This will
  *   be interpreted as "the given pixbuf is supposed to be used
  *   with the given scale factor", i.e. if the pixbuf's scale
@@ -2127,7 +2126,7 @@ gtk_image_view_set_pixbuf (GtkImageView    *image_view,
 /**
  * gtk_image_view_set_surface:
  * @image_view: A #GtkImageView instance
- * @surface: (nullable): A #cairo_surface_t of type #CAIRO_SURFACE_TYPE_IMAGE, or
+ * @surface: (nullable) (transfer full): A #cairo_surface_t of type #CAIRO_SURFACE_TYPE_IMAGE, or
  *   %NULL to unset any internal image data. In case this is %NULL, the scale will
  *   be reset to 1.0.
  */
@@ -2180,7 +2179,7 @@ gtk_image_view_set_surface (GtkImageView    *image_view,
 /**
  * gtk_image_view_set_animation:
  * @image_view: A #GtkImageView instance
- * @animation: The #GdkPixbufAnimation to use
+ * @animation: (transfer full): The #GdkPixbufAnimation to use
  * @scale_factor: The scale factor of the animation. This will
  *   be interpreted as "the given animation is supposed to be used
  *   with the given scale factor", i.e. if the animation's scale
