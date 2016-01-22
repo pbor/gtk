@@ -1978,7 +1978,7 @@ gtk_image_view_load_image_contents (GTask        *task,
 
   if (error)
     {
-      g_free (data);
+      g_slice_free (LoadTaskData, data);
       g_task_return_error (task, error);
       return;
     }
