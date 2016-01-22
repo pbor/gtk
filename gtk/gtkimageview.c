@@ -1997,9 +1997,9 @@ gtk_image_view_load_image_contents (GTask        *task,
 }
 
 static void
-gtk_image_view_load_from_input_stream (GTask *task,
-                                       gpointer source_object,
-                                       gpointer task_data,
+gtk_image_view_load_from_input_stream (GTask        *task,
+                                       gpointer      source_object,
+                                       gpointer      task_data,
                                        GCancellable *cancellable)
 {
   GtkImageView *image_view = source_object;
@@ -2043,13 +2043,14 @@ gtk_image_view_load_from_file_async (GtkImageView        *image_view,
 
   g_object_unref (task);
 }
-void
+gboolean
 gtk_image_view_load_from_file_finish   (GtkImageView  *image_view,
                                         GAsyncResult  *result,
                                         GError       **error)
 {
-  g_return_if_fail (g_task_is_valid (result, image_view));
-  g_task_propagate_pointer (G_TASK (result), error);
+  g_return_val_if_fail (g_task_is_valid (result, image_view), FALSE);
+
+  return g_task_propagate_boolean (G_TASK (result), error);
 }
 
 
@@ -2079,13 +2080,14 @@ gtk_image_view_load_from_stream_async (GtkImageView        *image_view,
 
   g_object_unref (task);
 }
-void
+gboolean
 gtk_image_view_load_from_stream_finish (GtkImageView  *image_view,
                                         GAsyncResult  *result,
                                         GError       **error)
 {
-  g_return_if_fail (g_task_is_valid (result, image_view));
-  g_task_propagate_pointer (G_TASK (result), error);
+  g_return_val_if_fail (g_task_is_valid (result, image_view), FALSE);
+
+  return g_task_propagate_boolean (G_TASK (result), error);
 }
 
 /*
