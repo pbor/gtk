@@ -160,16 +160,6 @@ gtk_image_view_get_current_state (GtkImageView *image_view,
   state->scale  = priv->scale;
 }
 
-static gchar *
-state_str (State *s)
-{
-  gchar *str = g_strdup_printf ("(Angle: %f, Scale: %f, hvalue: %f, vvalue: %f, hupper: %f, vupper: %f)",
-                                s->angle, s->scale, s->hvalue, s->vvalue, s->hupper, s->vupper);
-  return str;
-}
-
-
-
 
 static void
 free_load_task_data (LoadTaskData *data)
@@ -180,15 +170,10 @@ free_load_task_data (LoadTaskData *data)
 
 static void
 to_rotate_coords (GtkImageView *image_view,
-                  State *state,
+                  State        *state,
                   double  in_x,  double  in_y,
                   double *out_x, double *out_y)
 {
-  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
-
-  g_message ("hupper: %f", gtk_adjustment_get_upper (priv->hadjustment));
-  g_message ("hvalue: %f", gtk_adjustment_get_value (priv->hadjustment));
-
   double cx = state->hupper / 2.0 - state->hvalue;
   double cy = state->vupper / 2.0 - state->vvalue;
 
@@ -204,8 +189,12 @@ gtk_image_view_fix_anchor (GtkImageView *image_view,
                            State        *old_state)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
-  double hupper_delta = gtk_adjustment_get_upper (priv->hadjustment) - old_state->hupper;
-  double vupper_delta = gtk_adjustment_get_upper (priv->vadjustment) - old_state->vupper;
+  double hupper_delta = gtk_adjustment_get_upper (priv->hadjustment)
+                        - old_state->hupper;
+  double vupper_delta = gtk_adjustment_get_upper (priv->vadjustment)
+                        - old_state->vupper;
+  double hupper_delta_scale, vupper_delta_scale;
+  double hupper_delta_angle, vupper_delta_angle;
 
 
   g_assert (priv->hadjustment);
@@ -216,38 +205,15 @@ gtk_image_view_fix_anchor (GtkImageView *image_view,
   g_assert (anchor_x < gtk_widget_get_allocated_width (GTK_WIDGET (image_view)));
   g_assert (anchor_y < gtk_widget_get_allocated_height (GTK_WIDGET (image_view)));
 
-
-
-  g_message ("Old State: %s", state_str (old_state));
-  g_message ("New angle: %f", priv->angle);
-  g_message ("New scale: %f", priv->scale);
-
-  g_message ("Anchor: %f/%f", priv->anchor_x, priv->anchor_y);
-  g_message ("hupper_delta: %f", hupper_delta);
-  g_message ("vupper_delta: %f", vupper_delta);
-
-
-
-
-  double hupper = gtk_adjustment_get_upper (priv->hadjustment);
-  double hdiff_scale = (old_state->hupper / old_state->scale) * priv->scale;
-
-  double hd = hdiff_scale - old_state->hupper;
-
-  g_message ("hupper diff: %f", (hupper - old_state->hupper));
-  g_message ("scale_diff: %f", hd);
-  g_message ("angle_diff: %f", hupper_delta - hd);
-
-
   /* Amount of upper change caused by scale */
-  double hupper_delta_scale = ((old_state->hupper / old_state->scale) * priv->scale)
-                              - old_state->hupper;
-  double vupper_delta_scale = ((old_state->vupper / old_state->scale) * priv->scale)
-                              - old_state->vupper;
+  hupper_delta_scale = ((old_state->hupper / old_state->scale) * priv->scale)
+                       - old_state->hupper;
+  vupper_delta_scale = ((old_state->vupper / old_state->scale) * priv->scale)
+                       - old_state->vupper;
 
   /* Amount of upper change caused by angle */
-  double hupper_delta_angle = hupper_delta - hupper_delta_scale;
-  double vupper_delta_angle = vupper_delta - vupper_delta_scale;
+  hupper_delta_angle = hupper_delta - hupper_delta_scale;
+  vupper_delta_angle = vupper_delta - vupper_delta_scale;
 
 
 
@@ -281,55 +247,45 @@ gtk_image_view_fix_anchor (GtkImageView *image_view,
 
 
 
+  {
+    double rotate_anchor_x = 0;
+    double rotate_anchor_y = 0;
+    double anchor_angle;
+    double anchor_length;
+    double new_anchor_x, new_anchor_y;
+    double delta_x, delta_y;
 
-  double rotate_anchor_x = 0;
-  double rotate_anchor_y = 0;
+    /* Calculate the angle of the given anchor point relative to the
+     * bounding box center and the OLD state */
+    to_rotate_coords (image_view, old_state,
+                      anchor_x, anchor_y,
+                      &rotate_anchor_x, &rotate_anchor_y);
+    anchor_angle = atan2 (rotate_anchor_y, rotate_anchor_x);
+    anchor_length = sqrt ((rotate_anchor_x * rotate_anchor_x) +
+                          (rotate_anchor_y * rotate_anchor_y));
 
-  to_rotate_coords (image_view, old_state,
-                    anchor_x, anchor_y,
-                    &rotate_anchor_x, &rotate_anchor_y);
+    /* The angle of the anchor point NOW is the old angle plus
+     * the difference between old surface angle and new surface angle */
+    anchor_angle += DEG_TO_RAD (priv->angle - old_state->angle);
 
-  g_message ("Rotate anchor coords: %f/%f", rotate_anchor_x, rotate_anchor_y);
+    /* Calculate the position of the new anchor point, relative
+     * to the bounding box center */
+    new_anchor_x = cos (anchor_angle) * anchor_length;
+    new_anchor_y = sin (anchor_angle) * anchor_length;
 
-  /* 1) Calculate the angle of our anchor point. */
-  double anchor_angle = atan2 (rotate_anchor_y, rotate_anchor_x);
+    /* The difference between old anchor and new anchor
+     * is what we care about... */
+    delta_x = rotate_anchor_x - new_anchor_x;
+    delta_y = rotate_anchor_y - new_anchor_y;
 
+    /* At last, make the old anchor match the new anchor */
+    gtk_adjustment_set_value (priv->hadjustment,
+                              gtk_adjustment_get_value (priv->hadjustment) - delta_x);
+    gtk_adjustment_set_value (priv->vadjustment,
+                              gtk_adjustment_get_value (priv->vadjustment) - delta_y);
 
-  double anchor_length = sqrt ((rotate_anchor_x * rotate_anchor_x) +
-                               (rotate_anchor_y * rotate_anchor_y));
-  g_message ("Anchor angle: %f", RAD_TO_DEG (anchor_angle));
-  g_message ("Anchor length: %f", anchor_length);
+  }
 
-  /* 2) Calculate the position of our anchor point with increased angle */
-  double angle_diff = priv->angle - old_state->angle;
-  anchor_angle += DEG_TO_RAD (angle_diff);
-
-  g_message ("anchor angle after: %f", RAD_TO_DEG (anchor_angle));
-
-
-  g_message ("Angle got increased by %f", angle_diff);
-  double scale_diff = priv->scale - old_state->scale;
-  g_message ("Scale got increased by %f", scale_diff);
-  double new_anchor_x = cos (anchor_angle) * anchor_length;
-  double new_anchor_y = sin (anchor_angle) * anchor_length;
-
-  g_message ("New anchor: %f, %f", new_anchor_x, new_anchor_y);
-
-
-  double diff_x = rotate_anchor_x - new_anchor_x;
-  double diff_y = rotate_anchor_y - new_anchor_y;
-
-  g_message ("Diff: %f/%f", diff_x, diff_y);
-
-  gtk_adjustment_set_value (priv->hadjustment,
-                            gtk_adjustment_get_value (priv->hadjustment) - diff_x);
-
-
-  gtk_adjustment_set_value (priv->vadjustment,
-                            gtk_adjustment_get_value (priv->vadjustment) - diff_y);
-
-
-  g_message ("-------------------------");
   gtk_widget_queue_draw (GTK_WIDGET (image_view));
 }
 
