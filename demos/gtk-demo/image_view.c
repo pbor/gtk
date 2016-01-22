@@ -23,6 +23,8 @@ file_set_cb (GtkFileChooserButton *widget,
                                        NULL,
                                        generic_cb,
                                        NULL);
+
+  g_free (filename);
 }
 
 
