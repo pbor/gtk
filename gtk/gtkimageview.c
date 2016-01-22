@@ -2049,6 +2049,7 @@ gtk_image_view_load_from_file_finish   (GtkImageView  *image_view,
                                         GError       **error)
 {
   g_return_if_fail (g_task_is_valid (result, image_view));
+  g_task_propagate_pointer (G_TASK (result), error);
 }
 
 
@@ -2084,6 +2085,7 @@ gtk_image_view_load_from_stream_finish (GtkImageView  *image_view,
                                         GError       **error)
 {
   g_return_if_fail (g_task_is_valid (result, image_view));
+  g_task_propagate_pointer (G_TASK (result), error);
 }
 
 /*
