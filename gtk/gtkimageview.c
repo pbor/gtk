@@ -1827,7 +1827,11 @@ gtk_image_view_replace_surface (GtkImageView    *image_view,
   if (priv->image_surface)
     cairo_surface_destroy (priv->image_surface);
 
-  priv->scale_factor = scale_factor;
+  if (scale_factor == 0)
+    priv->scale_factor = gtk_widget_get_scale_factor (GTK_WIDGET (image_view));
+  else
+    priv->scale_factor = scale_factor;
+
   priv->image_surface = surface;
   priv->size_valid = FALSE;
 
@@ -2001,7 +2005,7 @@ gtk_image_view_load_from_file_async (GtkImageView        *image_view,
   LoadTaskData *task_data;
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
   g_return_if_fail (G_IS_FILE (file));
-  g_return_if_fail (scale_factor > 0);
+  g_return_if_fail (scale_factor >= 0);
 
   task_data = g_slice_new (LoadTaskData);
   task_data->scale_factor = scale_factor;
@@ -2038,7 +2042,7 @@ gtk_image_view_load_from_stream_async (GtkImageView        *image_view,
   LoadTaskData *task_data;
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
   g_return_if_fail (G_IS_INPUT_STREAM (input_stream));
-  g_return_if_fail (scale_factor > 0);
+  g_return_if_fail (scale_factor >= 0);
 
   task_data = g_slice_new (LoadTaskData);
   task_data->scale_factor = scale_factor;
@@ -2079,7 +2083,7 @@ gtk_image_view_set_pixbuf (GtkImageView    *image_view,
 
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
   g_return_if_fail (GDK_IS_PIXBUF (pixbuf));
-  g_return_if_fail (scale_factor > 0);
+  g_return_if_fail (scale_factor >= 0);
 
 
   if (priv->is_animation)
@@ -2164,7 +2168,7 @@ gtk_image_view_set_animation (GtkImageView       *image_view,
 {
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
   g_return_if_fail (GDK_IS_PIXBUF_ANIMATION (animation));
-  g_return_if_fail (scale_factor > 0);
+  g_return_if_fail (scale_factor >= 0);
 
   gtk_image_view_replace_animation (image_view, animation, scale_factor);
 }
