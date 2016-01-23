@@ -8,7 +8,7 @@
 
   <object class="GtkAdjustment" id="angle_adjustment">
     <property name="upper">360</property>
-    <property name="value">3</property>
+    <property name="value">0</property>
     <property name="step_increment">0.1</property>
     <!--<property name="step_increment">1</property>-->
     <!--<property name="step_increment">45</property>-->

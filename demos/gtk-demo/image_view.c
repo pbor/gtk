@@ -249,7 +249,7 @@ do_image_view (GtkWidget *do_widget)
 
   g_object_bind_property (scale_adjustment, "value", image_view, "scale",
                           G_BINDING_BIDIRECTIONAL);
-  g_object_bind_property (image_view, "angle", angle_adjustment, "value",
+  g_object_bind_property (angle_adjustment, "value", image_view, "angle",
                           G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
   g_object_bind_property (image_view, "snap-angle", snap_angle_button, "active",
                           G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
