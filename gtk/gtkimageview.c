@@ -545,7 +545,8 @@ gesture_zoom_cancel_cb (GtkGesture       *gesture,
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (user_data);
 
-  gtk_image_view_set_scale (user_data, priv->gesture_start_scale);
+  if (priv->in_zoom)
+    gtk_image_view_set_scale (user_data, priv->gesture_start_scale);
 
   priv->gesture_start_scale = 0.0;
   priv->in_zoom = FALSE;
@@ -633,7 +634,10 @@ gesture_rotate_cancel_cb (GtkGesture       *gesture,
                           gpointer          user_data)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (user_data);
-  gtk_image_view_set_angle (user_data, priv->gesture_start_angle);
+
+  if (priv->in_rotate)
+    gtk_image_view_set_angle (user_data, priv->gesture_start_angle);
+
   priv->in_rotate = FALSE;
   priv->gesture_start_angle = 0.0;
 
@@ -1111,7 +1115,7 @@ gtk_image_view_set_scale (GtkImageView *image_view,
   double pointer_y;
 
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
-  g_return_if_fail (scale >= 0.0);
+  g_return_if_fail (scale > 0.0);
 
   pointer_x = gtk_widget_get_allocated_width (GTK_WIDGET (image_view))  / 2;
   pointer_y = gtk_widget_get_allocated_height (GTK_WIDGET (image_view)) / 2;
