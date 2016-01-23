@@ -1165,26 +1165,31 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   gtk_image_view_get_current_state (image_view, &state);
 
   priv->angle = angle;
-  priv->size_valid = FALSE;
 
-
+  /* Setting the angle while fit-allocation is TRUE
+   * does not invalidate the bounding box size. */
+  if (!priv->fit_allocation)
+    priv->size_valid = FALSE;
 
   gtk_image_view_update_adjustments (image_view);
 
-
   g_object_notify_by_pspec (G_OBJECT (image_view),
                             widget_props[PROP_ANGLE]);
+
+  if (!priv->image_surface)
+    return;
 
   // XXX Pass a width/2, height/2 anchor here.
   //
   // TODO: Would we have to document this behavior? Or make it configurable?
 
 
-  if (priv->hadjustment != NULL && priv->vadjustment != NULL)
+  if (priv->hadjustment != NULL && priv->vadjustment != NULL &&
+      !priv->fit_allocation)
     gtk_image_view_fix_anchor (image_view,
-                                priv->anchor_x,
-                                priv->anchor_y,
-                                &state);
+                               priv->anchor_x,
+                               priv->anchor_y,
+                               &state);
 
   if (priv->fit_allocation)
     gtk_widget_queue_draw (GTK_WIDGET (image_view));
