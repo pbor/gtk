@@ -290,80 +290,6 @@ gtk_image_view_fix_anchor (GtkImageView *image_view,
 }
 
 static void
-gesture_rotate_end_cb (GtkGesture       *gesture,
-                       GdkEventSequence *sequence,
-                       gpointer          user_data)
-{
-  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (user_data);
-
-  priv->gesture_start_angle = 0.0;
-  priv->in_rotate = FALSE;
-
-  priv->anchor_x = -1;
-  priv->anchor_y = -1;
-}
-
-static void
-gesture_rotate_cancel_cb (GtkGesture       *gesture,
-                          GdkEventSequence *sequence,
-                          gpointer          user_data)
-{
-  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (user_data);
-  gtk_image_view_set_angle (user_data, priv->gesture_start_angle);
-  priv->in_rotate = FALSE;
-  priv->gesture_start_angle = 0.0;
-
-  priv->anchor_x = -1;
-  priv->anchor_y = -1;
-}
-
-
-static void
-gesture_angle_changed_cb (GtkGestureRotate *gesture,
-                          double            angle,
-                          double            delta,
-                          GtkWidget        *widget)
-{
-  GtkImageView *image_view = GTK_IMAGE_VIEW (widget);
-  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
-  State old_state;
-  double new_angle;
-
-  if (!priv->in_rotate)
-    {
-      priv->in_rotate = TRUE;
-      priv->gesture_start_angle = priv->angle;
-    }
-
-
-  new_angle = priv->gesture_start_angle + RAD_TO_DEG (delta);
-
-  if (new_angle == priv->angle)
-    return;
-
-
-  gtk_image_view_get_current_state (image_view, &old_state);
-
-  /* Don't notify */
-  priv->angle = new_angle;
-  priv->size_valid = FALSE;
-  gtk_image_view_update_adjustments (image_view);
-
-  if (priv->hadjustment && priv->vadjustment)
-    gtk_image_view_fix_anchor (image_view,
-                               priv->anchor_x,
-                               priv->anchor_y,
-                               &old_state);
-
-  // XXX Even if fit_allocation is not set, we still don't need to query a resize
-  //     if we are in a scrolledwindow, right?
-  if (priv->fit_allocation)
-    gtk_widget_queue_draw (widget);
-  else
-    gtk_widget_queue_resize (widget);
-}
-
-static void
 gtk_image_view_compute_bounding_box (GtkImageView *image_view,
                                      double       *width,
                                      double       *height,
@@ -570,6 +496,30 @@ gtk_image_view_set_scale_internal (GtkImageView *image_view,
   gtk_widget_queue_resize (GTK_WIDGET (image_view));
 }
 
+/* Zoom Gesture {{{ */
+
+static void
+gesture_zoom_begin_cb (GtkGesture       *gesture,
+                       GdkEventSequence *sequence,
+                       gpointer          user_data)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (user_data);
+
+  if (!priv->zoom_gesture_enabled ||
+      !priv->image_surface)
+    {
+      gtk_gesture_set_state (gesture, GTK_EVENT_SEQUENCE_DENIED);
+      return;
+    }
+
+  if (priv->anchor_x == -1 && priv->anchor_y == -1)
+    {
+      gtk_gesture_get_bounding_box_center (gesture,
+                                           &priv->anchor_x,
+                                           &priv->anchor_y);
+    }
+}
+
 static void
 gesture_zoom_end_cb (GtkGesture       *gesture,
                      GdkEventSequence *sequence,
@@ -603,9 +553,8 @@ gesture_zoom_cancel_cb (GtkGesture       *gesture,
   priv->anchor_y = -1;
 }
 
-
 static void
-gesture_scale_changed_cb (GtkGestureZoom *gesture,
+gesture_zoom_changed_cb (GtkGestureZoom *gesture,
                           double          delta,
                           GtkWidget      *widget)
 {
@@ -638,6 +587,9 @@ gesture_scale_changed_cb (GtkGestureZoom *gesture,
     }
 }
 
+/* }}} */
+
+/* Rotate Gesture {{{ */
 static void
 gesture_rotate_begin_cb (GtkGesture       *gesture,
                          GdkEventSequence *sequence,
@@ -645,7 +597,8 @@ gesture_rotate_begin_cb (GtkGesture       *gesture,
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (user_data);
 
-  if (!priv->rotate_gesture_enabled)
+  if (!priv->rotate_gesture_enabled ||
+      !priv->image_surface)
     {
       gtk_gesture_set_state (gesture, GTK_EVENT_SEQUENCE_DENIED);
       return;
@@ -661,27 +614,78 @@ gesture_rotate_begin_cb (GtkGesture       *gesture,
 }
 
 static void
-gesture_zoom_begin_cb (GtkGesture       *gesture,
+gesture_rotate_end_cb (GtkGesture       *gesture,
                        GdkEventSequence *sequence,
                        gpointer          user_data)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (user_data);
 
-  if (!priv->zoom_gesture_enabled)
-    {
-      gtk_gesture_set_state (gesture, GTK_EVENT_SEQUENCE_DENIED);
-      return;
-    }
+  priv->gesture_start_angle = 0.0;
+  priv->in_rotate = FALSE;
 
-
-  if (priv->anchor_x == -1 && priv->anchor_y == -1)
-    {
-      gtk_gesture_get_bounding_box_center (gesture,
-                                           &priv->anchor_x,
-                                           &priv->anchor_y);
-    }
+  priv->anchor_x = -1;
+  priv->anchor_y = -1;
 }
 
+static void
+gesture_rotate_cancel_cb (GtkGesture       *gesture,
+                          GdkEventSequence *sequence,
+                          gpointer          user_data)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (user_data);
+  gtk_image_view_set_angle (user_data, priv->gesture_start_angle);
+  priv->in_rotate = FALSE;
+  priv->gesture_start_angle = 0.0;
+
+  priv->anchor_x = -1;
+  priv->anchor_y = -1;
+}
+
+static void
+gesture_rotate_changed_cb (GtkGestureRotate *gesture,
+                          double            angle,
+                          double            delta,
+                          GtkWidget        *widget)
+{
+  GtkImageView *image_view = GTK_IMAGE_VIEW (widget);
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  State old_state;
+  double new_angle;
+
+  if (!priv->in_rotate)
+    {
+      priv->in_rotate = TRUE;
+      priv->gesture_start_angle = priv->angle;
+    }
+
+
+  new_angle = priv->gesture_start_angle + RAD_TO_DEG (delta);
+
+  if (new_angle == priv->angle)
+    return;
+
+
+  gtk_image_view_get_current_state (image_view, &old_state);
+
+  /* Don't notify */
+  priv->angle = new_angle;
+  priv->size_valid = FALSE;
+  gtk_image_view_update_adjustments (image_view);
+
+  if (priv->hadjustment && priv->vadjustment)
+    gtk_image_view_fix_anchor (image_view,
+                               priv->anchor_x,
+                               priv->anchor_y,
+                               &old_state);
+
+  // XXX Even if fit_allocation is not set, we still don't need to query a resize
+  //     if we are in a scrolledwindow, right?
+  if (priv->fit_allocation)
+    gtk_widget_queue_draw (widget);
+  else
+    gtk_widget_queue_resize (widget);
+}
+/* }}} */
 
 static void
 gtk_image_view_ensure_gestures (GtkImageView *image_view)
@@ -692,7 +696,7 @@ gtk_image_view_ensure_gestures (GtkImageView *image_view)
     {
       priv->zoom_gesture = gtk_gesture_zoom_new (GTK_WIDGET (image_view));
       g_signal_connect (priv->zoom_gesture, "scale-changed",
-                        (GCallback)gesture_scale_changed_cb, image_view);
+                        (GCallback)gesture_zoom_changed_cb, image_view);
       g_signal_connect (priv->zoom_gesture, "begin",
                         (GCallback)gesture_zoom_begin_cb, image_view);
       g_signal_connect (priv->zoom_gesture, "end",
@@ -710,7 +714,7 @@ gtk_image_view_ensure_gestures (GtkImageView *image_view)
       priv->rotate_gesture = gtk_gesture_rotate_new (GTK_WIDGET (image_view));
       /*gtk_event_controller_set_propagation_phase (GTK_EVENT_CONTROLLER (priv->rotate_gesture),*/
                                                   /*GTK_PHASE_CAPTURE);*/
-      g_signal_connect (priv->rotate_gesture, "angle-changed", (GCallback)gesture_angle_changed_cb, image_view);
+      g_signal_connect (priv->rotate_gesture, "angle-changed", (GCallback)gesture_rotate_changed_cb, image_view);
       g_signal_connect (priv->rotate_gesture, "begin", (GCallback)gesture_rotate_begin_cb, image_view);
       g_signal_connect (priv->rotate_gesture, "end", (GCallback)gesture_rotate_end_cb, image_view);
       g_signal_connect (priv->rotate_gesture, "cancel", (GCallback)gesture_rotate_cancel_cb, image_view);
