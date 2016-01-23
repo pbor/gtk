@@ -575,7 +575,6 @@ gesture_zoom_changed_cb (GtkGestureZoom *gesture,
 
   /* Don't emit */
   priv->scale = new_scale;
-  gtk_image_view_update_adjustments (image_view);
 
   gtk_image_view_set_scale_internal (image_view, new_scale);
 
@@ -676,7 +675,8 @@ gesture_rotate_changed_cb (GtkGestureRotate *gesture,
   priv->size_valid = FALSE;
   gtk_image_view_update_adjustments (image_view);
 
-  if (priv->hadjustment && priv->vadjustment)
+  if (priv->hadjustment && priv->vadjustment &&
+      !priv->fit_allocation)
     gtk_image_view_fix_anchor (image_view,
                                priv->anchor_x,
                                priv->anchor_y,
