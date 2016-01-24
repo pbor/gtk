@@ -165,6 +165,7 @@ static void
 free_load_task_data (LoadTaskData *data)
 {
   g_clear_object (&data->source);
+  g_slice_free (LoadTaskData, data);
 }
 
 
@@ -1923,15 +1924,15 @@ gtk_image_view_load_image_from_stream (GtkImageView *image_view,
 {
   GdkPixbufAnimation *result;
 
-
   g_assert (error == NULL);
   result = gdk_pixbuf_animation_new_from_stream (G_INPUT_STREAM (input_stream),
                                                  cancellable,
                                                  &error);
 
-  g_object_unref (input_stream);
   if (!error)
     gtk_image_view_replace_animation (image_view, result, scale_factor);
+
+  g_object_unref (input_stream);
 }
 
 static void
@@ -1950,12 +1951,13 @@ gtk_image_view_load_image_contents (GTask        *task,
 
   if (error)
     {
-      g_slice_free (LoadTaskData, data);
+      g_object_unref (in_stream);
       g_task_return_error (task, error);
       return;
     }
 
 
+  /* Closes and unrefs the input stream */
   gtk_image_view_load_image_from_stream (image_view,
                                          G_INPUT_STREAM (in_stream),
                                          data->scale_factor,
@@ -1964,8 +1966,6 @@ gtk_image_view_load_image_contents (GTask        *task,
 
   if (error)
     g_task_return_error (task, error);
-
-  g_slice_free (LoadTaskData, data);
 }
 
 static void
@@ -1979,6 +1979,7 @@ gtk_image_view_load_from_input_stream (GTask        *task,
   GInputStream *in_stream = G_INPUT_STREAM (data->source);
   GError *error = NULL;
 
+  /* Closes and unrefs the input stream */
   gtk_image_view_load_image_from_stream (image_view,
                                          in_stream,
                                          data->scale_factor,
@@ -1987,8 +1988,6 @@ gtk_image_view_load_from_input_stream (GTask        *task,
 
   if (error)
     g_task_return_error (task, error);
-
-  g_slice_free (LoadTaskData, data);
 }
 
 
