@@ -142,6 +142,7 @@
           <object class="GtkCheckButton" id="scrolled_check_button">
             <property name="visible">true</property>
             <property name="label">In ScrolledWindow</property>
+            <property name="active">true</property>
             <signal name="toggled" handler="scrolled_check_button_active_cb" />
           </object>
           <packing>
@@ -297,15 +298,19 @@
     </child>
 
     <child>
-      <object class="GtkImageView" id="image_view">
+      <object class="GtkScrolledWindow">
         <property name="visible">true</property>
-        <property name="hexpand">true</property>
-        <property name="vexpand">true</property>
-        <property name="width_request">400</property>
-        <property name="height_request">400</property>
+        <child>
+          <object class="GtkImageView" id="image_view">
+            <property name="visible">true</property>
+            <property name="hexpand">true</property>
+            <property name="vexpand">true</property>
+            <property name="width_request">400</property>
+            <property name="height_request">400</property>
+          </object>
+        </child>
       </object>
     </child>
-
   </object>
 
 
