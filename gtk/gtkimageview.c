@@ -1151,20 +1151,17 @@ gtk_image_view_set_scale (GtkImageView *image_view,
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   State state;
-  double pointer_x;
-  double pointer_y;
 
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
   g_return_if_fail (scale > 0.0);
-
-  pointer_x = gtk_widget_get_allocated_width (GTK_WIDGET (image_view))  / 2;
-  pointer_y = gtk_widget_get_allocated_height (GTK_WIDGET (image_view)) / 2;
 
   gtk_image_view_get_current_state (image_view, &state);
   gtk_image_view_set_scale_internal (image_view, scale);
 
   if (priv->hadjustment != NULL && priv->vadjustment != NULL)
     {
+      int pointer_x = gtk_widget_get_allocated_width (GTK_WIDGET (image_view)) / 2;
+      int pointer_y = gtk_widget_get_allocated_height (GTK_WIDGET (image_view)) / 2;
       gtk_image_view_fix_anchor (image_view,
                                  pointer_x,
                                  pointer_y,
