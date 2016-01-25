@@ -1976,7 +1976,7 @@ gtk_image_view_load_image_contents (GTask        *task,
 
   if (error)
     {
-      g_object_unref (in_stream);
+      /* in_stream is NULL */
       g_task_return_error (task, error);
       return;
     }
