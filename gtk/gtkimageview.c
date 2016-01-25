@@ -1215,16 +1215,16 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   if (!priv->image_surface)
     return;
 
-  // XXX Pass a width/2, height/2 anchor here.
-  //
   // TODO: Would we have to document this behavior? Or make it configurable?
-
-
   if (priv->hadjustment && priv->vadjustment && !priv->fit_allocation)
-    gtk_image_view_fix_anchor (image_view,
-                               priv->anchor_x,
-                               priv->anchor_y,
-                               &state);
+    {
+      int pointer_x = gtk_widget_get_allocated_width (GTK_WIDGET (image_view)) / 2;
+      int pointer_y = gtk_widget_get_allocated_height (GTK_WIDGET (image_view)) / 2;
+      gtk_image_view_fix_anchor (image_view,
+                                 pointer_x,
+                                 pointer_y,
+                                 &state);
+    }
 
   if (priv->fit_allocation)
     gtk_widget_queue_draw (GTK_WIDGET (image_view));
