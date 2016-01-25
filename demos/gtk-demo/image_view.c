@@ -150,11 +150,11 @@ load_pixbuf_button_clicked_cb ()
   GdkPixbuf *pixbuf;
 
   /* I really hope you have this. */
-  pixbuf = gdk_pixbuf_new_from_file ("/home/baedert/imageview2.png",
+  pixbuf = gdk_pixbuf_new_from_file ("/usr/share/backgrounds/gnome/Fabric.jpg",
                                      NULL);
 
   g_assert (pixbuf != NULL);
-  gtk_image_view_set_pixbuf (GTK_IMAGE_VIEW (image_view), pixbuf, 2);
+  gtk_image_view_set_pixbuf (GTK_IMAGE_VIEW (image_view), pixbuf, 0);
 
   g_object_unref (G_OBJECT (pixbuf));
 }
