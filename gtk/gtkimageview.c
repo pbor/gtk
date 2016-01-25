@@ -49,6 +49,7 @@ struct _GtkImageViewPrivate
   gboolean in_rotate              : 1;
   gboolean in_zoom                : 1;
   gboolean size_valid             : 1;
+  gboolean transitions_enabled    : 1;
 
   GtkGesture *rotate_gesture;
   double      gesture_start_angle;
@@ -98,6 +99,7 @@ enum
   PROP_ZOOM_GESTURE_ENABLED,
   PROP_SNAP_ANGLE,
   PROP_FIT_ALLOCATION,
+  PROP_TRANSITIONS_ENABLED,
 
   LAST_WIDGET_PROPERTY,
   PROP_HADJUSTMENT,
@@ -408,6 +410,7 @@ gtk_image_view_compute_bounding_box (GtkImageView *image_view,
 
   if (priv->fit_allocation)
     {
+      g_assert (!priv->scale_set);
       priv->scale = scale;
       g_object_notify_by_pspec (G_OBJECT (image_view),
                                 widget_props[PROP_SCALE]);
@@ -496,14 +499,6 @@ gtk_image_view_update_adjustments (GtkImageView *image_view)
     }
 }
 
-
-
-
-/*
- * This is basically the normal _set_scale without the
- * _fix_anchor call at the end, so we can choose the point
- * to fix.
- */
 static void
 gtk_image_view_set_scale_internal (GtkImageView *image_view,
                                    double        scale)
@@ -516,10 +511,9 @@ gtk_image_view_set_scale_internal (GtkImageView *image_view,
   g_object_notify_by_pspec (G_OBJECT (image_view),
                             widget_props[PROP_SCALE]);
 
-
-  if (!priv->scale_set)
+  if (priv->scale_set)
     {
-      priv->scale_set = TRUE;
+      priv->scale_set = FALSE;
       g_object_notify_by_pspec (G_OBJECT (image_view),
                                 widget_props[PROP_SCALE_SET]);
     }
@@ -564,17 +558,11 @@ gesture_zoom_begin_cb (GtkGesture       *gesture,
 static void
 gesture_zoom_end_cb (GtkGesture       *gesture,
                      GdkEventSequence *sequence,
-                     gpointer          user_data)
+                     gpointer          image_view)
 {
-  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (user_data);
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
-  priv->scale = priv->gesture_scale;
-  priv->size_valid = FALSE;
-  g_object_notify_by_pspec (G_OBJECT (user_data),
-                            widget_props[PROP_SCALE]);
-
-  gtk_image_view_update_adjustments (user_data);
-  gtk_widget_queue_resize (user_data);
+  gtk_image_view_set_scale_internal (image_view, priv->gesture_scale);
 
   priv->in_zoom = FALSE;
   priv->anchor_x = -1;
@@ -720,8 +708,6 @@ gesture_rotate_changed_cb (GtkGestureRotate *gesture,
                                priv->anchor_y,
                                &old_state);
 
-  // XXX Even if fit_allocation is not set, we still don't need to query a resize
-  //     if we are in a scrolledwindow, right?
   if (priv->fit_allocation)
     gtk_widget_queue_draw (widget);
   else
@@ -794,6 +780,7 @@ gtk_image_view_init (GtkImageView *image_view)
   priv->anchor_y = -1;
   priv->rotate_gesture_enabled = TRUE;
   priv->zoom_gesture_enabled = TRUE;
+  priv->transitions_enabled = TRUE;
 
   gtk_image_view_ensure_gestures (image_view);
 }
@@ -877,6 +864,8 @@ frameclock_cb (GtkWidget     *widget,
   if (t >= 1.0)
     {
       priv->angle = priv->transition_end_angle;
+      g_object_notify_by_pspec (G_OBJECT (widget),
+                                widget_props[PROP_ANGLE]);
       return G_SOURCE_REMOVE;
     }
 
@@ -1155,8 +1144,30 @@ gtk_image_view_set_scale (GtkImageView *image_view,
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
   g_return_if_fail (scale > 0.0);
 
+  g_message ("New scale: %f", scale);
+
   gtk_image_view_get_current_state (image_view, &state);
-  gtk_image_view_set_scale_internal (image_view, scale);
+
+  priv->scale = scale;
+  g_object_notify_by_pspec (G_OBJECT (image_view),
+                            widget_props[PROP_SCALE]);
+
+  if (priv->scale_set)
+    {
+      priv->scale_set = FALSE;
+      g_object_notify_by_pspec (G_OBJECT (image_view),
+                                widget_props[PROP_SCALE_SET]);
+    }
+
+  if (priv->fit_allocation)
+    {
+      priv->fit_allocation = FALSE;
+      g_object_notify_by_pspec (G_OBJECT (image_view),
+                                widget_props[PROP_FIT_ALLOCATION]);
+    }
+
+  priv->size_valid = FALSE;
+  gtk_image_view_update_adjustments (image_view);
 
   if (priv->hadjustment != NULL && priv->vadjustment != NULL)
     {
@@ -1167,6 +1178,8 @@ gtk_image_view_set_scale (GtkImageView *image_view,
                                  pointer_y,
                                  &state);
     }
+
+  gtk_widget_queue_resize (GTK_WIDGET (image_view));
 }
 
 double
@@ -1317,7 +1330,7 @@ gtk_image_view_set_fit_allocation (GtkImageView *image_view,
   g_object_notify_by_pspec (G_OBJECT (image_view),
                             widget_props[PROP_SCALE_SET]);
 
-  if (!priv->fit_allocation && !priv->scale_set)
+  if (!priv->fit_allocation)
     {
       priv->scale = 1.0;
       g_object_notify_by_pspec (G_OBJECT (image_view),
@@ -1394,6 +1407,34 @@ gtk_image_view_get_zoom_gesture_enabled (GtkImageView *image_view)
   g_return_val_if_fail (GTK_IS_IMAGE_VIEW (image_view), FALSE);
 
   return priv->zoom_gesture_enabled;
+}
+
+
+
+void
+gtk_image_view_set_transitions_enabled (GtkImageView *image_view,
+                                        gboolean      transitions_enabled)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
+
+  transitions_enabled = !!transitions_enabled;
+
+  if (transitions_enabled != priv->transitions_enabled)
+    {
+      priv->transitions_enabled = transitions_enabled;
+      g_object_notify_by_pspec (G_OBJECT (image_view),
+                                widget_props[PROP_TRANSITIONS_ENABLED]);
+    }
+}
+
+gboolean
+gtk_image_view_get_transitions_enabled (GtkImageView *image_view)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  g_return_val_if_fail (GTK_IS_IMAGE_VIEW (image_view), FALSE);
+
+  return priv->transitions_enabled;
 }
 /* }}} */
 
@@ -1826,6 +1867,20 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
                                                             FALSE,
                                                             GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
 
+  /**
+   *  GtkImageView:transitions-enabled
+   *
+   *  Whether or not certain property changes will be interpolated.
+   *
+   *  Since: 3.20
+   */
+  widget_props[PROP_TRANSITIONS_ENABLED] = g_param_spec_boolean ("transitions-enabled",
+                                                                 P_("Foo"),
+                                                                 P_("fooar"),
+                                                                 TRUE,
+                                                                 GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
+
+
 
   g_object_class_install_properties (object_class, LAST_WIDGET_PROPERTY, widget_props);
 
@@ -2152,6 +2207,9 @@ gtk_image_view_set_surface (GtkImageView    *image_view,
       priv->scale = 1.0;
       g_object_notify_by_pspec (G_OBJECT (image_view),
                                 widget_props[PROP_SCALE]);
+      priv->scale_set = FALSE;
+      g_object_notify_by_pspec (G_OBJECT (image_view),
+                                widget_props[PROP_SCALE_SET]);
     }
 
 
