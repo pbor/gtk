@@ -714,8 +714,7 @@ gesture_rotate_changed_cb (GtkGestureRotate *gesture,
   priv->size_valid = FALSE;
   gtk_image_view_update_adjustments (image_view);
 
-  if (priv->hadjustment && priv->vadjustment &&
-      !priv->fit_allocation)
+  if (priv->hadjustment && priv->vadjustment && !priv->fit_allocation)
     gtk_image_view_fix_anchor (image_view,
                                priv->anchor_x,
                                priv->anchor_y,
@@ -1221,8 +1220,7 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   // TODO: Would we have to document this behavior? Or make it configurable?
 
 
-  if (priv->hadjustment != NULL && priv->vadjustment != NULL &&
-      !priv->fit_allocation)
+  if (priv->hadjustment && priv->vadjustment && !priv->fit_allocation)
     gtk_image_view_fix_anchor (image_view,
                                priv->anchor_x,
                                priv->anchor_y,
@@ -1332,7 +1330,6 @@ gtk_image_view_set_fit_allocation (GtkImageView *image_view,
   gtk_image_view_update_adjustments (image_view);
 
   gtk_widget_queue_resize (GTK_WIDGET (image_view));
-  gtk_image_view_update_adjustments (image_view);
 }
 
 gboolean
