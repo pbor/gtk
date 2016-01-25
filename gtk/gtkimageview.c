@@ -1578,11 +1578,14 @@ gtk_image_view_scroll_event (GtkWidget       *widget,
   double new_scale = priv->scale - (0.1 * event->delta_y);
   State state;
 
+  if (!priv->image_surface)
+    return GDK_EVENT_PROPAGATE;
+
   gtk_image_view_get_current_state (image_view, &state);
 
   gtk_image_view_set_scale_internal (image_view, new_scale);
 
-  if (priv->hadjustment != NULL && priv->vadjustment != NULL)
+  if (priv->hadjustment && priv->vadjustment)
     {
       gtk_image_view_fix_anchor (image_view,
                                  event->x,
