@@ -1470,7 +1470,8 @@ gtk_image_view_realize (GtkWidget *widget)
                           GDK_BUTTON_PRESS_MASK |
                           GDK_BUTTON_RELEASE_MASK |
                           GDK_SMOOTH_SCROLL_MASK |
-                          GDK_SCROLL_MASK;
+                          GDK_SCROLL_MASK |
+                          GDK_TOUCH_MASK;
   attributes.wclass = GDK_INPUT_ONLY;
 
   window = gtk_widget_get_parent_window (widget);
@@ -1623,6 +1624,11 @@ gtk_image_view_scroll_event (GtkWidget       *widget,
 
   if (!priv->image_surface)
     return GDK_EVENT_PROPAGATE;
+
+  if (event->state & GDK_SHIFT_MASK ||
+      event->state & GDK_CONTROL_MASK)
+    return GDK_EVENT_PROPAGATE;
+
 
   gtk_image_view_get_current_state (image_view, &state);
 
