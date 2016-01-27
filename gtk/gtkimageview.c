@@ -269,7 +269,7 @@ static void
 gtk_image_view_do_snapping (GtkImageView *image_view)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
-  double new_angle = (int) ((priv->angle) / 90.0) * 90;
+  double new_angle = (int) ((priv->angle + 45.0) / 90.0) * 90;
 
   g_assert (priv->snap_angle);
 
@@ -520,6 +520,7 @@ static void
 gtk_image_view_update_adjustments (GtkImageView *image_view)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  double width, height;
   int widget_width  = gtk_widget_get_allocated_width  (GTK_WIDGET (image_view));
   int widget_height = gtk_widget_get_allocated_height (GTK_WIDGET (image_view));
 
@@ -538,39 +539,23 @@ gtk_image_view_update_adjustments (GtkImageView *image_view)
       return;
     }
 
+  gtk_image_view_compute_bounding_box (image_view,
+                                       &width,
+                                       &height,
+                                       NULL);
 
-  if (priv->fit_allocation)
-    {
-      if (priv->hadjustment)
-        gtk_adjustment_set_upper (priv->hadjustment, widget_width);
-
-      if (priv->vadjustment)
-        gtk_adjustment_set_upper (priv->vadjustment, widget_height);
-    }
-  else
-    {
-      double width, height;
-      gtk_image_view_compute_bounding_box (image_view,
-                                           &width,
-                                           &height,
-                                           NULL);
-
-      if (priv->hadjustment)
-        gtk_adjustment_set_upper (priv->hadjustment, MAX (width,  widget_width));
-
-      if (priv->vadjustment)
-        gtk_adjustment_set_upper (priv->vadjustment, MAX (height, widget_height));
-    }
-
-
+  /* compute_bounding_box makes sure that the bounding box is never bigger than
+   * the widget allocation if fit-allocation is set */
   if (priv->hadjustment)
     {
+      gtk_adjustment_set_upper (priv->hadjustment, MAX (width,  widget_width));
       gtk_adjustment_set_page_size (priv->hadjustment, widget_width);
       gtk_image_view_restrict_adjustment (priv->hadjustment);
     }
 
   if (priv->vadjustment)
     {
+      gtk_adjustment_set_upper (priv->vadjustment, MAX (height, widget_height));
       gtk_adjustment_set_page_size (priv->vadjustment, widget_height);
       gtk_image_view_restrict_adjustment (priv->vadjustment);
     }
@@ -1231,11 +1216,7 @@ gtk_image_view_set_angle (GtkImageView *image_view,
 
   gtk_image_view_get_current_state (image_view, &state);
   priv->angle = gtk_image_view_clamp_angle (angle);
-
-  /* Setting the angle while fit-allocation is TRUE
-   * does not invalidate the bounding box size. */
-  if (!priv->fit_allocation)
-    priv->size_valid = FALSE;
+  priv->size_valid = FALSE;
 
   gtk_image_view_update_adjustments (image_view);
 
@@ -1280,8 +1261,8 @@ gtk_image_view_get_angle (GtkImageView *image_view)
  *
  * Setting #snap-angle to #TRUE will cause @image_view's  angle to
  * be snapped to 90° steps. Setting the #angle property will cause it to
- * be set to the lower 90° step, e.g. setting #angle to 359 will cause
- * the new value to be 270.
+ * be set to the closest 90° step, so e.g. using an angle of 40 will result
+ * in an angle of 0, using using 240 will result in 270, etc.
  */
 void
 gtk_image_view_set_snap_angle (GtkImageView *image_view,
