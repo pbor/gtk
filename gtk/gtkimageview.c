@@ -677,6 +677,13 @@ gesture_zoom_changed_cb (GtkGestureZoom *gesture,
       priv->gesture_start_scale = priv->scale;
     }
 
+  if (priv->fit_allocation)
+    {
+      priv->fit_allocation = FALSE;
+      g_object_notify_by_pspec (G_OBJECT (widget),
+                                widget_props[PROP_FIT_ALLOCATION]);
+    }
+
   new_scale = priv->gesture_start_scale * delta;
   gtk_image_view_get_current_state (image_view, &state);
 
