@@ -19,6 +19,7 @@
 #define RAD_TO_DEG(x) (((x) / (2.0 * M_PI) * 360.0))
 
 #define TRANSITION_DURATION (150.0 * 1000.0)
+/*#define TRANSITION_DURATION (1500.0 * 1000.0)*/
 
 typedef struct
 {
@@ -50,6 +51,7 @@ struct _GtkImageViewPrivate
   gboolean in_zoom                : 1;
   gboolean size_valid             : 1;
   gboolean transitions_enabled    : 1;
+  gboolean in_angle_transition    : 1;
 
   GtkGesture *rotate_gesture;
   double      gesture_start_angle;
@@ -57,7 +59,7 @@ struct _GtkImageViewPrivate
 
   GtkGesture *zoom_gesture;
   double      gesture_start_scale;
-  double      gesture_angle;
+  double      visible_angle;
 
   /* Current anchor point, or -1/-1.
    * In widget coordinates. */
@@ -80,9 +82,10 @@ struct _GtkImageViewPrivate
   int                     animation_timeout;
 
   /* Transitions */
-  gint64 angle_transition_start;
+  double transition_angle; /* Currently visible angle during the transition */
   double transition_start_angle;
-  double transition_end_angle;
+  gint64 angle_transition_start;
+  /*double transition_end_angle;*/
 
   double cached_width;
   double cached_height;
@@ -163,8 +166,8 @@ gtk_image_view_get_real_angle (GtkImageView *image_view)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
-  if (priv->in_rotate)
-    return priv->gesture_angle;
+  if (priv->in_rotate || priv->in_angle_transition)
+    return priv->visible_angle;
   else
     return priv->angle;
 }
@@ -185,7 +188,6 @@ gtk_image_view_clamp_angle (double angle)
   return new_angle;
 }
 
-
 static void
 gtk_image_view_get_current_state (GtkImageView *image_view,
                                   State        *state)
@@ -203,6 +205,81 @@ gtk_image_view_get_current_state (GtkImageView *image_view,
   state->scale = gtk_image_view_get_real_scale (image_view);
 }
 
+static gboolean
+gtk_image_view_transitions_enabled (GtkImageView *image_view)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  gboolean animations_enabled;
+
+  g_object_get (gtk_widget_get_settings (GTK_WIDGET (image_view)),
+                "gtk-enable-animations", &animations_enabled,
+                NULL);
+
+
+  return priv->transitions_enabled && animations_enabled;
+}
+
+static gboolean
+frameclock_cb (GtkWidget     *widget,
+               GdkFrameClock *frame_clock,
+               gpointer       user_data)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (GTK_IMAGE_VIEW (widget));
+  gint64 now = gdk_frame_clock_get_frame_time (frame_clock);
+
+  double t = (now - priv->angle_transition_start) / TRANSITION_DURATION;
+  double new_angle = (priv->angle - priv->transition_start_angle) * t;
+
+  priv->visible_angle = priv->transition_start_angle + new_angle;
+  priv->size_valid = FALSE;
+
+  if (priv->fit_allocation)
+    gtk_widget_queue_draw (widget);
+  else
+    gtk_widget_queue_resize (widget);
+
+  if (t >= 1.0)
+    {
+      priv->in_angle_transition = FALSE;
+      return G_SOURCE_REMOVE;
+    }
+
+  return G_SOURCE_CONTINUE;
+}
+
+
+static void
+gtk_image_view_animate_to_angle (GtkImageView *image_view,
+                                 double        target_angle)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+
+  /* Target angle is priv->angle */
+  priv->in_angle_transition = TRUE;
+  priv->transition_start_angle = priv->angle;
+  priv->angle_transition_start = gdk_frame_clock_get_frame_time (gtk_widget_get_frame_clock (GTK_WIDGET (image_view)));
+
+  gtk_widget_add_tick_callback (GTK_WIDGET (image_view), frameclock_cb, NULL, NULL);
+
+}
+
+
+
+static void
+gtk_image_view_do_snapping (GtkImageView *image_view)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  double new_angle = (int) ((priv->angle) / 90.0) * 90;
+
+  g_assert (priv->snap_angle);
+
+  if (gtk_image_view_transitions_enabled (image_view))
+    gtk_image_view_animate_to_angle (image_view, new_angle);
+
+  priv->angle = new_angle;
+
+  /* Don't notify! */
+}
 
 static void
 free_load_task_data (LoadTaskData *data)
@@ -652,7 +729,13 @@ gesture_rotate_end_cb (GtkGesture       *gesture,
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
-  priv->angle = gtk_image_view_clamp_angle (priv->gesture_angle);
+  priv->angle = gtk_image_view_clamp_angle (priv->visible_angle);
+
+  if (priv->snap_angle)
+    {
+      /* Will update priv->angle */
+      gtk_image_view_do_snapping (image_view);
+    }
   g_object_notify_by_pspec (image_view,
                             widget_props[PROP_ANGLE]);
 
@@ -698,7 +781,7 @@ gesture_rotate_changed_cb (GtkGestureRotate *gesture,
   new_angle = priv->gesture_start_angle + RAD_TO_DEG (delta);
   gtk_image_view_get_current_state (image_view, &old_state);
 
-  priv->gesture_angle = new_angle;
+  priv->visible_angle = new_angle;
   priv->size_valid = FALSE;
   gtk_image_view_update_adjustments (image_view);
 
@@ -771,7 +854,7 @@ gtk_image_view_init (GtkImageView *image_view)
   priv->scale = 1.0;
   priv->angle = 0.0;
   priv->gesture_scale = 1.0;
-  priv->gesture_angle = 0.0;
+  priv->visible_angle = 0.0;
   priv->snap_angle = FALSE;
   priv->fit_allocation = FALSE;
   priv->scale_set = FALSE;
@@ -839,76 +922,6 @@ gtk_image_view_stop_animation (GtkImageView *image_view)
       g_source_remove (priv->animation_timeout);
       priv->animation_timeout = 0;
     }
-}
-
-
-static gboolean
-frameclock_cb (GtkWidget     *widget,
-               GdkFrameClock *frame_clock,
-               gpointer       user_data)
-{
-  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (GTK_IMAGE_VIEW (widget));
-  gint64 now = gdk_frame_clock_get_frame_time (frame_clock);
-
-  double t = (now - priv->angle_transition_start) / TRANSITION_DURATION;
-
-  double new_angle = (priv->transition_end_angle - priv->transition_start_angle) * t;
-
-  priv->angle = priv->transition_start_angle + new_angle;
-
-  if (priv->fit_allocation)
-    gtk_widget_queue_draw (widget);
-  else
-    gtk_widget_queue_resize (widget);
-
-  if (t >= 1.0)
-    {
-      priv->angle = priv->transition_end_angle;
-      g_object_notify_by_pspec (G_OBJECT (widget),
-                                widget_props[PROP_ANGLE]);
-      return G_SOURCE_REMOVE;
-    }
-
-  return G_SOURCE_CONTINUE;
-}
-
-
-static void
-gtk_image_view_animate_to_angle (GtkImageView *image_view,
-                                 double        start_angle)
-{
-  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
-  /* target angle is priv->angle! */
-
-  priv->transition_start_angle = start_angle;
-  priv->transition_end_angle   = priv->angle;
-  priv->angle_transition_start = gdk_frame_clock_get_frame_time (gtk_widget_get_frame_clock (GTK_WIDGET (image_view)));
-  gtk_widget_add_tick_callback (GTK_WIDGET (image_view), frameclock_cb, NULL, NULL);
-}
-
-static void
-gtk_image_view_do_snapping (GtkImageView *image_view,
-                            double        angle)
-{
-  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
-  int new_angle;
-
-  g_assert (priv->snap_angle);
-
-  /* Snap to angles of 0, 90, 180 and 270 degrees */
-
-  new_angle = (int) ((angle) / 90.0) * 90;
-
-  if (new_angle != priv->angle)
-    {
-      double old_angle = priv->angle;
-      priv->angle = new_angle;
-      /* XXX Make this conditional */
-      gtk_image_view_animate_to_angle (image_view,
-                                       old_angle);
-    }
-
-  priv->angle = new_angle;
 }
 
 static gboolean
@@ -1268,6 +1281,7 @@ gtk_image_view_set_snap_angle (GtkImageView *image_view,
                                gboolean     snap_angle)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
 
   snap_angle = !!snap_angle;
@@ -1280,7 +1294,11 @@ gtk_image_view_set_snap_angle (GtkImageView *image_view,
                             widget_props[PROP_SNAP_ANGLE]);
 
   if (priv->snap_angle)
-    gtk_image_view_do_snapping (image_view, priv->angle);
+    {
+      gtk_image_view_do_snapping (image_view);
+      g_object_notify_by_pspec (G_OBJECT (image_view),
+                                widget_props[PROP_ANGLE]);
+    }
 }
 
 gboolean
