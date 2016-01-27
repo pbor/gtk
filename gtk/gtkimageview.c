@@ -1149,8 +1149,6 @@ gtk_image_view_set_scale (GtkImageView *image_view,
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
   g_return_if_fail (scale > 0.0);
 
-  g_message ("New scale: %f", scale);
-
   gtk_image_view_get_current_state (image_view, &state);
 
   priv->scale = scale;
@@ -1173,6 +1171,10 @@ gtk_image_view_set_scale (GtkImageView *image_view,
 
   priv->size_valid = FALSE;
   gtk_image_view_update_adjustments (image_view);
+
+  if (!priv->image_surface)
+    return;
+
 
   if (priv->hadjustment != NULL && priv->vadjustment != NULL)
     {
