@@ -19,7 +19,8 @@
 #define RAD_TO_DEG(x) (((x) / (2.0 * M_PI) * 360.0))
 
 #define TRANSITION_DURATION (150.0 * 1000.0)
-/*#define TRANSITION_DURATION (1500.0 * 1000.0)*/
+#define ANGLE_TRANSITION_MIN_DELTA (1.0)
+#define SCALE_TRANSITION_MIN_DELTA (0.01)
 
 typedef struct
 {
@@ -219,10 +220,20 @@ gtk_image_view_transitions_enabled (GtkImageView *image_view)
   return priv->transitions_enabled && animations_enabled;
 }
 
+
+static void
+gtk_image_view_animate_to_scale (GtkImageView *image_view,
+                                 double        new_scale)
+{
+  /*GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (GTK_IMAGE_VIEW (widget));*/
+  /*gint64 now = gdk_frame_clock_get_frame_time (frame_clock);*/
+
+}
+
 static gboolean
-frameclock_cb (GtkWidget     *widget,
-               GdkFrameClock *frame_clock,
-               gpointer       user_data)
+angle_frameclock_cb (GtkWidget     *widget,
+                     GdkFrameClock *frame_clock,
+                     gpointer       user_data)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (GTK_IMAGE_VIEW (widget));
   gint64 now = gdk_frame_clock_get_frame_time (frame_clock);
@@ -259,10 +270,10 @@ gtk_image_view_animate_to_angle (GtkImageView *image_view,
   priv->transition_start_angle = priv->angle;
   priv->angle_transition_start = gdk_frame_clock_get_frame_time (gtk_widget_get_frame_clock (GTK_WIDGET (image_view)));
 
-  gtk_widget_add_tick_callback (GTK_WIDGET (image_view), frameclock_cb, NULL, NULL);
-
+  gtk_widget_add_tick_callback (GTK_WIDGET (image_view),
+                                angle_frameclock_cb,
+                                NULL, NULL);
 }
-
 
 
 static void
@@ -1217,6 +1228,12 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
 
   gtk_image_view_get_current_state (image_view, &state);
+
+  if (gtk_image_view_transitions_enabled (image_view) &&
+      ABS(gtk_image_view_clamp_angle (angle) - priv->angle) > ANGLE_TRANSITION_MIN_DELTA)
+      gtk_image_view_animate_to_angle (image_view, angle);
+
+
   priv->angle = gtk_image_view_clamp_angle (angle);
   priv->size_valid = FALSE;
 
@@ -1228,7 +1245,6 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   if (!priv->image_surface)
     return;
 
-  // TODO: Would we have to document this behavior? Or make it configurable?
   if (priv->hadjustment && priv->vadjustment && !priv->fit_allocation)
     {
       int pointer_x = gtk_widget_get_allocated_width (GTK_WIDGET (image_view)) / 2;
