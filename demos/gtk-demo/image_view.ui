@@ -206,11 +206,11 @@
           </packing>
         </child>
 
+
         <child>
-          <object class="GtkSpinButton" id="angle_spin_button">
+          <object class="GtkScale" id="angle_spin_button">
             <property name="visible">true</property>
             <property name="digits">2</property>
-            <property name="numeric">true</property>
             <property name="adjustment">angle_adjustment</property>
           </object>
           <packing>
@@ -219,7 +219,6 @@
             <property name="width">2</property>
           </packing>
         </child>
-
 
         <child>
           <object class="GtkLabel">
@@ -236,10 +235,9 @@
         </child>
 
         <child>
-          <object class="GtkSpinButton" id="scale_spin_button">
+          <object class="GtkScale" id="scale_spin_button">
             <property name="visible">true</property>
             <property name="digits">2</property>
-            <property name="numeric">true</property>
             <property name="adjustment">scale_adjustment</property>
           </object>
           <packing>
