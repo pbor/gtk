@@ -28,6 +28,8 @@ struct _GdkSeatDefaultPrivate
   GdkDevice *master_keyboard;
   GList *slave_pointers;
   GList *slave_keyboards;
+
+  GPtrArray *tools;
 };
 
 #define KEYBOARD_EVENTS (GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK |    \
@@ -73,6 +75,12 @@ gdk_seat_dispose (GObject *object)
     {
       gdk_seat_device_removed (GDK_SEAT (seat), l->data);
       g_object_unref (l->data);
+    }
+
+  if (priv->tools)
+    {
+      g_ptr_array_unref (priv->tools);
+      priv->tools = NULL;
     }
 
   g_list_free (priv->slave_pointers);
@@ -244,6 +252,30 @@ gdk_seat_default_get_slaves (GdkSeat             *seat,
   return devices;
 }
 
+static GdkDeviceTool *
+gdk_seat_default_get_tool (GdkSeat *seat,
+                           guint64  serial)
+{
+  GdkSeatDefaultPrivate *priv;
+  GdkDeviceTool *tool;
+  guint i;
+
+  priv = gdk_seat_default_get_instance_private (GDK_SEAT_DEFAULT (seat));
+
+  if (!priv->tools)
+    return NULL;
+
+  for (i = 0; i < priv->tools->len; i++)
+    {
+      tool = g_ptr_array_index (priv->tools, i);
+
+      if (tool->serial == serial)
+        return tool;
+    }
+
+  return NULL;
+}
+
 static void
 gdk_seat_default_class_init (GdkSeatDefaultClass *klass)
 {
@@ -259,6 +291,8 @@ gdk_seat_default_class_init (GdkSeatDefaultClass *klass)
 
   seat_class->get_master = gdk_seat_default_get_master;
   seat_class->get_slaves = gdk_seat_default_get_slaves;
+
+  seat_class->get_tool = gdk_seat_default_get_tool;
 }
 
 static void
@@ -338,4 +372,41 @@ gdk_seat_default_remove_slave (GdkSeatDefault *seat,
       priv->slave_keyboards = g_list_remove (priv->slave_keyboards, device);
       gdk_seat_device_removed (GDK_SEAT (seat), device);
     }
+}
+
+void
+gdk_seat_default_add_tool (GdkSeatDefault *seat,
+                           GdkDeviceTool  *tool)
+{
+  GdkSeatDefaultPrivate *priv;
+
+  g_return_if_fail (GDK_IS_SEAT_DEFAULT (seat));
+  g_return_if_fail (tool != NULL);
+
+  priv = gdk_seat_default_get_instance_private (seat);
+
+  if (!priv->tools)
+    priv->tools = g_ptr_array_new_with_free_func ((GDestroyNotify) gdk_device_tool_unref);
+
+  g_ptr_array_add (priv->tools, gdk_device_tool_ref (tool));
+  g_signal_emit_by_name (seat, "tool-added", tool);
+}
+
+void
+gdk_seat_default_remove_tool (GdkSeatDefault *seat,
+                              GdkDeviceTool  *tool)
+{
+  GdkSeatDefaultPrivate *priv;
+
+  g_return_if_fail (GDK_IS_SEAT_DEFAULT (seat));
+  g_return_if_fail (tool != NULL);
+
+  priv = gdk_seat_default_get_instance_private (seat);
+
+  if (tool != gdk_seat_get_tool (GDK_SEAT (seat),
+                                 gdk_device_tool_get_serial (tool)))
+    return;
+
+  g_signal_emit_by_name (seat, "tool-removed", tool);
+  g_ptr_array_remove (priv->tools, tool);
 }
