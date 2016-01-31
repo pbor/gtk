@@ -18,7 +18,8 @@
 #define DEG_TO_RAD(x) (((x) / 360.0) * (2 * M_PI))
 #define RAD_TO_DEG(x) (((x) / (2.0 * M_PI) * 360.0))
 
-#define TRANSITION_DURATION (150.0 * 1000.0)
+/*#define TRANSITION_DURATION (150.0 * 1000.0)*/
+#define TRANSITION_DURATION (1500.0 * 1000.0)
 #define ANGLE_TRANSITION_MIN_DELTA (1.0)
 #define SCALE_TRANSITION_MIN_DELTA (0.01)
 
@@ -31,11 +32,6 @@ typedef struct
   double angle;
   double scale;
 } State;
-
-
-// XXX Add gtk_image_reset_view that transitions back to scale = 1 and angle = 0.
-
-// TODO: Set scale-set to FALSE every time we manipulate it from inside gtkimageview
 
 struct _GtkImageViewPrivate
 {
@@ -53,14 +49,15 @@ struct _GtkImageViewPrivate
   gboolean size_valid             : 1;
   gboolean transitions_enabled    : 1;
   gboolean in_angle_transition    : 1;
+  gboolean in_scale_transition    : 1;
 
   GtkGesture *rotate_gesture;
   double      gesture_start_angle;
-  double      gesture_scale;
+  double      visible_angle;
 
   GtkGesture *zoom_gesture;
   double      gesture_start_scale;
-  double      visible_angle;
+  double      visible_scale;
 
   /* Current anchor point, or -1/-1.
    * In widget coordinates. */
@@ -83,10 +80,11 @@ struct _GtkImageViewPrivate
   int                     animation_timeout;
 
   /* Transitions */
-  double transition_angle; /* Currently visible angle during the transition */
   double transition_start_angle;
   gint64 angle_transition_start;
-  /*double transition_end_angle;*/
+
+  double transition_start_scale;
+  gint64 scale_transition_start;
 
   double cached_width;
   double cached_height;
@@ -147,6 +145,11 @@ static void gtk_image_view_compute_bounding_box (GtkImageView *image_view,
 static void gtk_image_view_ensure_gestures (GtkImageView *image_view);
 
 static inline void gtk_image_view_restrict_adjustment (GtkAdjustment *adjustment);
+static void gtk_image_view_fix_anchor (GtkImageView *image_view,
+                                       double        anchor_x,
+                                       double        anchor_y,
+                                       State        *old_state);
+
 /* }}} */
 
 
@@ -155,8 +158,8 @@ gtk_image_view_get_real_scale (GtkImageView *image_view)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
-  if (priv->in_zoom)
-    return priv->gesture_scale;
+  if (priv->in_zoom || priv->in_scale_transition)
+    return priv->visible_scale;
   else
     return priv->scale;
 }
@@ -221,13 +224,67 @@ gtk_image_view_transitions_enabled (GtkImageView *image_view)
 }
 
 
+static gboolean
+scale_frameclock_cb (GtkWidget     *widget,
+                     GdkFrameClock *frame_clock,
+                     gpointer       user_data)
+{
+  GtkImageView *image_view = GTK_IMAGE_VIEW (widget);
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  State state;
+  gint64 now = gdk_frame_clock_get_frame_time (frame_clock);
+
+  double t = (now - priv->scale_transition_start) / TRANSITION_DURATION;
+  double new_scale = (priv->scale - priv->transition_start_scale) * t;
+
+  gtk_image_view_get_current_state (image_view, &state);
+
+  priv->visible_scale = priv->transition_start_scale + new_scale;
+  priv->size_valid = FALSE;
+
+  if (priv->hadjustment && priv->vadjustment)
+    {
+      State state;
+      GtkAllocation allocation;
+      gtk_widget_get_allocation (widget, &allocation);
+      gtk_image_view_update_adjustments (image_view);
+
+      gtk_image_view_fix_anchor (image_view,
+                                 allocation.width / 2,
+                                 allocation.height / 2,
+                                 &state);
+
+    }
+
+
+  if (priv->fit_allocation)
+    gtk_widget_queue_draw (widget);
+  else
+    gtk_widget_queue_resize (widget);
+
+  if (t >= 1.0)
+    {
+      priv->in_scale_transition = FALSE;
+      return G_SOURCE_REMOVE;
+    }
+
+  return G_SOURCE_CONTINUE;
+}
+
 static void
 gtk_image_view_animate_to_scale (GtkImageView *image_view,
                                  double        new_scale)
 {
-  /*GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (GTK_IMAGE_VIEW (widget));*/
-  /*gint64 now = gdk_frame_clock_get_frame_time (frame_clock);*/
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
+  /* Target scale is priv->scale */
+  priv->in_scale_transition = TRUE;
+  priv->transition_start_scale = priv->scale;
+  priv->scale_transition_start = gdk_frame_clock_get_frame_time (gtk_widget_get_frame_clock (GTK_WIDGET (image_view)));
+
+  gtk_widget_add_tick_callback (GTK_WIDGET (image_view),
+                                scale_frameclock_cb,
+                                NULL, NULL);
 }
 
 static gboolean
@@ -635,7 +692,7 @@ gesture_zoom_end_cb (GtkGesture       *gesture,
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
-  gtk_image_view_set_scale_internal (image_view, priv->gesture_scale);
+  gtk_image_view_set_scale_internal (image_view, priv->visible_scale);
 
   priv->in_zoom = FALSE;
   priv->anchor_x = -1;
@@ -683,7 +740,7 @@ gesture_zoom_changed_cb (GtkGestureZoom *gesture,
   new_scale = priv->gesture_start_scale * delta;
   gtk_image_view_get_current_state (image_view, &state);
 
-  priv->gesture_scale = new_scale;
+  priv->visible_scale = new_scale;
   priv->size_valid = FALSE;
 
   gtk_image_view_update_adjustments (image_view);
@@ -856,7 +913,7 @@ gtk_image_view_init (GtkImageView *image_view)
 
   priv->scale = 1.0;
   priv->angle = 0.0;
-  priv->gesture_scale = 1.0;
+  priv->visible_scale = 1.0;
   priv->visible_angle = 0.0;
   priv->snap_angle = FALSE;
   priv->fit_allocation = FALSE;
@@ -1161,6 +1218,9 @@ gtk_image_view_set_scale (GtkImageView *image_view,
   g_return_if_fail (scale > 0.0);
 
   gtk_image_view_get_current_state (image_view, &state);
+
+  if (gtk_image_view_transitions_enabled (image_view))
+    gtk_image_view_animate_to_scale (image_view, scale);
 
   priv->scale = scale;
   g_object_notify_by_pspec (G_OBJECT (image_view),
