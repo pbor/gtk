@@ -5,6 +5,14 @@
 GtkWidget *image_view;
 GtkWidget *uri_entry;
 
+
+void
+reset_view_button_clicked_cb ()
+{
+  gtk_image_view_set_scale (GTK_IMAGE_VIEW (image_view), 1.0);
+  gtk_image_view_set_angle (GTK_IMAGE_VIEW (image_view), 0.0);
+}
+
 void
 generic_cb ()
 {
@@ -26,7 +34,6 @@ file_set_cb (GtkFileChooserButton *widget,
 
   g_free (filename);
 }
-
 
 static void
 image_loaded_cb (GObject      *source_object,

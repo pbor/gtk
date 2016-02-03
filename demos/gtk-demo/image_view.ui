@@ -291,6 +291,23 @@
           </packing>
         </child>
 
+
+        <child>
+          <object class="GtkButton" id="reset_button">
+            <property name="visible">true</property>
+            <property name="label" translatable="true">Reset View</property>
+            <property name="valign">end</property>
+            <property name="vexpand">true</property>
+            <signal name="clicked" handler="reset_view_button_clicked_cb" />
+          </object>
+          <packing>
+            <property name="left_attach">0</property>
+            <property name="top_attach">16</property>
+            <property name="width">2</property>
+          </packing>
+        </child>
+
+
       </object>
 
     </child>
