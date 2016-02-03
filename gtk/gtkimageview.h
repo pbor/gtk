@@ -32,7 +32,6 @@ struct _GtkImageView
 struct _GtkImageViewClass
 {
   GtkWidgetClass parent_class;
-  void (* prepare_image) (cairo_surface_t *image);
 };
 
 

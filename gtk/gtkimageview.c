@@ -18,8 +18,8 @@
 #define DEG_TO_RAD(x) (((x) / 360.0) * (2 * M_PI))
 #define RAD_TO_DEG(x) (((x) / (2.0 * M_PI) * 360.0))
 
-/*#define TRANSITION_DURATION (150.0 * 1000.0)*/
-#define TRANSITION_DURATION (1500.0 * 1000.0)
+#define TRANSITION_DURATION (150.0 * 1000.0)
+/*#define TRANSITION_DURATION (1500.0 * 1000.0)*/
 #define ANGLE_TRANSITION_MIN_DELTA (1.0)
 #define SCALE_TRANSITION_MIN_DELTA (0.01)
 
@@ -244,7 +244,6 @@ scale_frameclock_cb (GtkWidget     *widget,
 
   if (priv->hadjustment && priv->vadjustment)
     {
-      State state;
       GtkAllocation allocation;
       gtk_widget_get_allocation (widget, &allocation);
       gtk_image_view_update_adjustments (image_view);
@@ -253,7 +252,6 @@ scale_frameclock_cb (GtkWidget     *widget,
                                  allocation.width / 2,
                                  allocation.height / 2,
                                  &state);
-
     }
 
 
@@ -279,6 +277,7 @@ gtk_image_view_animate_to_scale (GtkImageView *image_view,
 
   /* Target scale is priv->scale */
   priv->in_scale_transition = TRUE;
+  priv->visible_scale = priv->scale;
   priv->transition_start_scale = priv->scale;
   priv->scale_transition_start = gdk_frame_clock_get_frame_time (gtk_widget_get_frame_clock (GTK_WIDGET (image_view)));
 
@@ -292,14 +291,31 @@ angle_frameclock_cb (GtkWidget     *widget,
                      GdkFrameClock *frame_clock,
                      gpointer       user_data)
 {
-  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (GTK_IMAGE_VIEW (widget));
+  GtkImageView *image_view = GTK_IMAGE_VIEW (widget);
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  State state;
   gint64 now = gdk_frame_clock_get_frame_time (frame_clock);
 
   double t = (now - priv->angle_transition_start) / TRANSITION_DURATION;
   double new_angle = (priv->angle - priv->transition_start_angle) * t;
 
+  gtk_image_view_get_current_state (image_view, &state);
+
   priv->visible_angle = priv->transition_start_angle + new_angle;
   priv->size_valid = FALSE;
+
+
+  if (priv->hadjustment && priv->vadjustment)
+    {
+      GtkAllocation allocation;
+      gtk_widget_get_allocation (widget, &allocation);
+      gtk_image_view_update_adjustments (image_view);
+
+      gtk_image_view_fix_anchor (image_view,
+                                 allocation.width / 2,
+                                 allocation.height / 2,
+                                 &state);
+    }
 
   if (priv->fit_allocation)
     gtk_widget_queue_draw (widget);
@@ -324,6 +340,7 @@ gtk_image_view_animate_to_angle (GtkImageView *image_view,
 
   /* Target angle is priv->angle */
   priv->in_angle_transition = TRUE;
+  priv->visible_angle = priv->angle;
   priv->transition_start_angle = priv->angle;
   priv->angle_transition_start = gdk_frame_clock_get_frame_time (gtk_widget_get_frame_clock (GTK_WIDGET (image_view)));
 
@@ -387,6 +404,8 @@ gtk_image_view_fix_anchor (GtkImageView *image_view,
   double cur_scale = gtk_image_view_get_real_scale (image_view);
 
 
+  g_assert (old_state->hupper > 0);
+  g_assert (old_state->vupper > 0);
   g_assert (priv->hadjustment);
   g_assert (priv->vadjustment);
   g_assert (priv->size_valid);
@@ -404,9 +423,6 @@ gtk_image_view_fix_anchor (GtkImageView *image_view,
   /* Amount of upper change caused by angle */
   hupper_delta_angle = hupper_delta - hupper_delta_scale;
   vupper_delta_angle = vupper_delta - vupper_delta_scale;
-
-
-
 
   /* As a first step, fix the anchor point with regard to the
    * updated scale
