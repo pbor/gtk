@@ -37,6 +37,7 @@
 #include <xkbcommon/xkbcommon.h>
 
 #include "gdkinternals.h"
+#include "primary-selection-unstable-v1-client-protocol.h"
 
 #include "config.h"
 
@@ -188,6 +189,9 @@ struct wl_data_device * gdk_wayland_device_get_data_device (GdkDevice *gdk_devic
 void gdk_wayland_device_set_selection (GdkDevice             *gdk_device,
                                        struct wl_data_source *source);
 
+void gdk_wayland_seat_set_primary (GdkSeat                                *seat,
+                                   struct zwp_primary_selection_source_v1 *source);
+
 GdkDragContext * gdk_wayland_device_get_drop_context (GdkDevice *gdk_device);
 
 void gdk_wayland_device_unset_touch_grab (GdkDevice        *device,
@@ -242,6 +246,9 @@ void gdk_wayland_selection_free (GdkWaylandSelection *selection);
 
 void gdk_wayland_selection_ensure_offer (GdkDisplay           *display,
                                          struct wl_data_offer *wl_offer);
+void gdk_wayland_selection_ensure_primary_offer (GdkDisplay                            *display,
+                                                 struct zwp_primary_selection_offer_v1 *wp_offer);
+
 void gdk_wayland_selection_set_offer (GdkDisplay           *display,
                                       GdkAtom               selection,
                                       struct wl_data_offer *wl_offer);
