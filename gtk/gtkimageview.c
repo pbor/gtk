@@ -23,6 +23,16 @@
 #define ANGLE_TRANSITION_MIN_DELTA (1.0)
 #define SCALE_TRANSITION_MIN_DELTA (0.01)
 
+
+/*
+ *  TODO:
+ *
+ *   - Angle transition from 395 to 5 does a -390deg rotation
+ *   - transition from !fit-allocation to fit-allocation and back
+ *
+ */
+
+
 typedef struct
 {
   double hupper;
@@ -1097,15 +1107,6 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
   cairo_pattern_set_filter (cairo_get_source (ct), CAIRO_FILTER_FAST);
   cairo_fill (ct);
   cairo_restore (ct);
-
-
-  /* XXX @debug */
-  if (priv->anchor_x != -1 && priv->anchor_y != -1)
-    {
-      cairo_set_source_rgba (ct, 0, 1, 0, 1);
-      cairo_rectangle (ct, priv->anchor_x - 1, priv->anchor_y - 1, 2, 2);
-      cairo_fill (ct);
-    }
 
   return GDK_EVENT_PROPAGATE;
 }
