@@ -202,6 +202,12 @@ gtk_image_view_clamp_angle (double angle)
   return new_angle;
 }
 
+static inline int
+gtk_image_view_get_snapped_angle (double angle)
+{
+  return (int) ((angle + 45.0) / 90.0) * 90;
+}
+
 static void
 gtk_image_view_get_current_state (GtkImageView *image_view,
                                   State        *state)
@@ -230,7 +236,7 @@ gtk_image_view_transitions_enabled (GtkImageView *image_view)
                 NULL);
 
 
-  return priv->transitions_enabled && animations_enabled;
+  return priv->transitions_enabled && animations_enabled && priv->image_surface;
 }
 
 
@@ -364,7 +370,7 @@ static void
 gtk_image_view_do_snapping (GtkImageView *image_view)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
-  double new_angle = (int) ((priv->angle + 45.0) / 90.0) * 90;
+  double new_angle = gtk_image_view_get_snapped_angle (priv->angle);
 
   g_assert (priv->snap_angle);
 
@@ -1310,8 +1316,13 @@ gtk_image_view_set_angle (GtkImageView *image_view,
       ABS(gtk_image_view_clamp_angle (angle) - priv->angle) > ANGLE_TRANSITION_MIN_DELTA)
       gtk_image_view_animate_to_angle (image_view, angle);
 
+  angle = gtk_image_view_clamp_angle (angle);
 
-  priv->angle = gtk_image_view_clamp_angle (angle);
+  if (priv->snap_angle)
+    priv->angle = gtk_image_view_get_snapped_angle (angle);
+  else
+    priv->angle = angle;
+
   priv->size_valid = FALSE;
 
   gtk_image_view_update_adjustments (image_view);
