@@ -124,59 +124,107 @@
           </packing>
         </child>
 
-
-
         <child>
-          <object class="GtkCheckButton" id="fit_allocation_check_button">
+          <object class="GtkLabel">
             <property name="visible">true</property>
             <property name="label" translatable="yes">Fit Allocation</property>
+            <property name="halign">start</property>
           </object>
           <packing>
             <property name="left_attach">0</property>
             <property name="top_attach">6</property>
-            <property name="width">2</property>
+            <property name="width">1</property>
           </packing>
         </child>
 
+        <child>
+          <object class="GtkSwitch" id="fit_allocation_switch">
+           <property name="visible">true</property>
+         </object>
+         <packing>
+           <property name="left_attach">1</property>
+           <property name="top_attach">6</property>
+         </packing>
+        </child>
+
+
+
+
 
         <child>
-          <object class="GtkCheckButton" id="scrolled_check_button">
+          <object class="GtkLabel">
             <property name="visible">true</property>
             <property name="label">In ScrolledWindow</property>
-            <property name="active">true</property>
-            <signal name="toggled" handler="scrolled_check_button_active_cb" />
+            <property name="halign">start</property>
           </object>
           <packing>
             <property name="left_attach">0</property>
             <property name="top_attach">7</property>
-            <property name="width">2</property>
+            <property name="width">1</property>
           </packing>
         </child>
 
         <child>
-          <object class="GtkCheckButton" id="zoom_gesture_check_button">
+          <object class="GtkSwitch" id="scrolled_switch">
+            <property name="visible">true</property>
+            <property name="active">true</property>
+            <signal name="notify::active" handler="scrolled_switch_active_cb" />
+         </object>
+         <packing>
+           <property name="left_attach">1</property>
+           <property name="top_attach">7</property>
+         </packing>
+        </child>
+
+
+        <child>
+          <object class="GtkLabel">
             <property name="visible">true</property>
             <property name="label">Zoom Gesture Enabled</property>
+            <property name="halign">start</property>
           </object>
           <packing>
             <property name="left_attach">0</property>
             <property name="top_attach">8</property>
-            <property name="width">2</property>
+            <property name="width">1</property>
           </packing>
         </child>
 
         <child>
-          <object class="GtkCheckButton" id="rotate_gesture_check_button">
+          <object class="GtkSwitch" id="zoom_gesture_switch">
+            <property name="visible">true</property>
+            <property name="active">true</property>
+         </object>
+         <packing>
+           <property name="left_attach">1</property>
+           <property name="top_attach">8</property>
+         </packing>
+        </child>
+
+
+        <child>
+          <object class="GtkLabel">
             <property name="visible">true</property>
             <property name="label">Rotate Gesture Enabled</property>
+            <property name="halign">start</property>
           </object>
           <packing>
             <property name="left_attach">0</property>
             <property name="top_attach">9</property>
-            <property name="width">2</property>
+            <property name="width">1</property>
           </packing>
         </child>
 
+        <child>
+          <object class="GtkSwitch" id="rotate_gesture_switch">
+            <property name="visible">true</property>
+            <property name="active">true</property>
+         </object>
+         <packing>
+           <property name="left_attach">1</property>
+           <property name="top_attach">9</property>
+         </packing>
+        </child>
 
 
 

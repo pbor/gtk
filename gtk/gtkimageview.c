@@ -1240,6 +1240,9 @@ gtk_image_view_set_scale (GtkImageView *image_view,
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
   g_return_if_fail (scale > 0.0);
 
+  if (scale == priv->scale)
+    return;
+
   gtk_image_view_get_current_state (image_view, &state);
 
   if (gtk_image_view_transitions_enabled (image_view))
@@ -1309,6 +1312,9 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   State state;
 
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
+
+  if (angle == priv->angle)
+    return;
 
   gtk_image_view_get_current_state (image_view, &state);
 
