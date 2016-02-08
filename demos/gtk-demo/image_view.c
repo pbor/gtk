@@ -214,7 +214,7 @@ do_image_view (GtkWidget *do_widget)
   GtkWidget *window   = gtk_window_new (GTK_WINDOW_TOPLEVEL);
   GtkBuilder *builder = gtk_builder_new_from_resource ("/imageview/image_view.ui");
   GtkWidget *box      = GTK_WIDGET (gtk_builder_get_object (builder, "box"));
-  GtkWidget *snap_angle_button = GTK_WIDGET (gtk_builder_get_object (builder, "snap_angle_check_button"));
+  GtkWidget *snap_angle_switch = GTK_WIDGET (gtk_builder_get_object (builder, "snap_angle_switch"));
   GtkWidget *fit_allocation_switch = GTK_WIDGET (gtk_builder_get_object (builder, "fit_allocation_switch"));
   GtkWidget *rotate_gesture_switch = GTK_WIDGET (gtk_builder_get_object (builder, "rotate_gesture_switch"));
   GtkWidget *zoom_gesture_switch = GTK_WIDGET (gtk_builder_get_object (builder, "zoom_gesture_switch"));
@@ -237,7 +237,7 @@ do_image_view (GtkWidget *do_widget)
 
 
 
-  g_object_bind_property (image_view, "snap-angle", snap_angle_button, "active",
+  g_object_bind_property (image_view, "snap-angle", snap_angle_switch, "active",
                           G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
   g_object_bind_property (image_view, "fit-allocation", fit_allocation_switch, "active",
                           G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
