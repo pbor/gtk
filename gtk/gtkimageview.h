@@ -56,8 +56,6 @@ void gtk_image_view_set_animation (GtkImageView       *image_view,
                                    int                 scale_factor);
 
 
-/* Loading {{{ */
-
 GDK_AVAILABLE_IN_3_20
 void gtk_image_view_load_from_file_async (GtkImageView        *image_view,
                                           GFile               *file,
@@ -82,9 +80,6 @@ gboolean gtk_image_view_load_from_stream_finish (GtkImageView  *image_view,
                                                  GAsyncResult  *result,
                                                  GError       **error);
 
-/* }}} */
-
-/* Setters/Getters {{{ */
 GDK_AVAILABLE_IN_3_20
 void   gtk_image_view_set_scale (GtkImageView *image_view,
                                  double        scale);
@@ -122,22 +117,20 @@ gboolean gtk_image_view_get_fit_allocation (GtkImageView *image_view);
 
 
 GDK_AVAILABLE_IN_3_20
-void gtk_image_view_set_rotate_gesture_enabled (GtkImageView *image_view,
-                                                gboolean      rotate_gesture_enabled);
+void gtk_image_view_set_rotatable (GtkImageView *image_view,
+                                   gboolean      rotate_gesture_enabled);
 
 GDK_AVAILABLE_IN_3_20
-gboolean gtk_image_view_get_rotate_gesture_enabled (GtkImageView *image_view);
+gboolean gtk_image_view_get_rotatable (GtkImageView *image_view);
 
 
 
 GDK_AVAILABLE_IN_3_20
-void gtk_image_view_set_zoom_gesture_enabled (GtkImageView *image_view,
-                                              gboolean      zoom_gesture_enabled);
+void gtk_image_view_set_zoomable (GtkImageView *image_view,
+                                  gboolean      zoom_gesture_enabled);
 
 GDK_AVAILABLE_IN_3_20
-gboolean gtk_image_view_get_zoom_gesture_enabled (GtkImageView *image_view);
-
-/* }}} */
+gboolean gtk_image_view_get_zoomable (GtkImageView *image_view);
 
 G_END_DECLS
 

@@ -242,11 +242,11 @@ do_image_view (GtkWidget *do_widget)
   g_object_bind_property (image_view, "fit-allocation", fit_allocation_switch, "active",
                           G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
 
-  g_object_bind_property (image_view, "rotate-gesture-enabled",
+  g_object_bind_property (image_view, "rotatable",
                           rotate_gesture_switch, "active",
                           G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
 
-  g_object_bind_property (image_view, "zoom-gesture-enabled",
+  g_object_bind_property (image_view, "zoomable",
                           zoom_gesture_switch, "active",
                           G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
 

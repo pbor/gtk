@@ -52,8 +52,8 @@ struct _GtkImageViewPrivate
   gboolean fit_allocation         : 1;
   gboolean scale_set              : 1;
   gboolean snap_angle             : 1;
-  gboolean rotate_gesture_enabled : 1;
-  gboolean zoom_gesture_enabled   : 1;
+  gboolean rotatable : 1;
+  gboolean zoomable   : 1;
   gboolean in_rotate              : 1;
   gboolean in_zoom                : 1;
   gboolean size_valid             : 1;
@@ -107,8 +107,8 @@ enum
   PROP_SCALE = 1,
   PROP_SCALE_SET,
   PROP_ANGLE,
-  PROP_ROTATE_GESTURE_ENABLED,
-  PROP_ZOOM_GESTURE_ENABLED,
+  PROP_ROTATABLE,
+  PROP_ZOOMABLE,
   PROP_SNAP_ANGLE,
   PROP_FIT_ALLOCATION,
   PROP_TRANSITIONS_ENABLED,
@@ -693,8 +693,6 @@ gtk_image_view_set_scale_internal (GtkImageView *image_view,
   gtk_widget_queue_resize (GTK_WIDGET (image_view));
 }
 
-/* Zoom Gesture {{{ */
-
 static void
 gesture_zoom_begin_cb (GtkGesture       *gesture,
                        GdkEventSequence *sequence,
@@ -702,7 +700,7 @@ gesture_zoom_begin_cb (GtkGesture       *gesture,
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (user_data);
 
-  if (!priv->zoom_gesture_enabled ||
+  if (!priv->zoomable ||
       !priv->image_surface)
     {
       gtk_gesture_set_state (gesture, GTK_EVENT_SEQUENCE_DENIED);
@@ -788,9 +786,6 @@ gesture_zoom_changed_cb (GtkGestureZoom *gesture,
   gtk_widget_queue_resize (GTK_WIDGET (image_view));
 }
 
-/* }}} */
-
-/* Rotate Gesture {{{ */
 static void
 gesture_rotate_begin_cb (GtkGesture       *gesture,
                          GdkEventSequence *sequence,
@@ -798,7 +793,7 @@ gesture_rotate_begin_cb (GtkGesture       *gesture,
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (user_data);
 
-  if (!priv->rotate_gesture_enabled ||
+  if (!priv->rotatable ||
       !priv->image_surface)
     {
       gtk_gesture_set_state (gesture, GTK_EVENT_SEQUENCE_DENIED);
@@ -888,14 +883,13 @@ gesture_rotate_changed_cb (GtkGestureRotate *gesture,
   else
     gtk_widget_queue_resize (widget);
 }
-/* }}} */
 
 static void
 gtk_image_view_ensure_gestures (GtkImageView *image_view)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
-  if (priv->zoom_gesture_enabled && priv->zoom_gesture == NULL)
+  if (priv->zoomable && priv->zoom_gesture == NULL)
     {
       priv->zoom_gesture = gtk_gesture_zoom_new (GTK_WIDGET (image_view));
       g_signal_connect (priv->zoom_gesture, "scale-changed",
@@ -907,12 +901,12 @@ gtk_image_view_ensure_gestures (GtkImageView *image_view)
       g_signal_connect (priv->zoom_gesture, "cancel",
                         (GCallback)gesture_zoom_cancel_cb, image_view);
     }
-  else if (!priv->zoom_gesture_enabled && priv->zoom_gesture != NULL)
+  else if (!priv->zoomable && priv->zoom_gesture != NULL)
     {
       g_clear_object (&priv->zoom_gesture);
     }
 
-  if (priv->rotate_gesture_enabled && priv->rotate_gesture == NULL)
+  if (priv->rotatable && priv->rotate_gesture == NULL)
     {
       priv->rotate_gesture = gtk_gesture_rotate_new (GTK_WIDGET (image_view));
       /*gtk_event_controller_set_propagation_phase (GTK_EVENT_CONTROLLER (priv->rotate_gesture),*/
@@ -924,7 +918,7 @@ gtk_image_view_ensure_gestures (GtkImageView *image_view)
 
 
     }
-  else if (!priv->rotate_gesture_enabled && priv->rotate_gesture != NULL)
+  else if (!priv->rotatable && priv->rotate_gesture != NULL)
     {
       g_clear_object (&priv->rotate_gesture);
     }
@@ -953,8 +947,8 @@ gtk_image_view_init (GtkImageView *image_view)
   priv->size_valid = FALSE;
   priv->anchor_x = -1;
   priv->anchor_y = -1;
-  priv->rotate_gesture_enabled = TRUE;
-  priv->zoom_gesture_enabled = TRUE;
+  priv->rotatable = TRUE;
+  priv->zoomable = TRUE;
   priv->transitions_enabled = TRUE;
 
   gtk_image_view_ensure_gestures (image_view);
@@ -1117,7 +1111,6 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
   return GDK_EVENT_PROPAGATE;
 }
 
-/* Property Getter/Setter {{{ */
 static void
 gtk_image_view_set_hadjustment (GtkImageView  *image_view,
                                 GtkAdjustment *hadjustment)
@@ -1472,59 +1465,59 @@ gtk_image_view_get_fit_allocation (GtkImageView *image_view)
 
 
 void
-gtk_image_view_set_rotate_gesture_enabled (GtkImageView *image_view,
-                                           gboolean      rotate_gesture_enabled)
+gtk_image_view_set_rotatable (GtkImageView *image_view,
+                              gboolean      rotatable)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
 
-  rotate_gesture_enabled = !!rotate_gesture_enabled;
+  rotatable = !!rotatable;
 
-  if (priv->rotate_gesture_enabled != rotate_gesture_enabled)
+  if (priv->rotatable != rotatable)
     {
-      priv->rotate_gesture_enabled = rotate_gesture_enabled;
+      priv->rotatable = rotatable;
       gtk_image_view_ensure_gestures (image_view);
       g_object_notify_by_pspec (G_OBJECT (image_view),
-                                widget_props[PROP_ROTATE_GESTURE_ENABLED]);
+                                widget_props[PROP_ROTATABLE]);
     }
 }
 
 gboolean
-gtk_image_view_get_rotate_gesture_enabled (GtkImageView *image_view)
+gtk_image_view_get_rotatable (GtkImageView *image_view)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   g_return_val_if_fail (GTK_IS_IMAGE_VIEW (image_view), FALSE);
 
-  return priv->rotate_gesture_enabled;
+  return priv->rotatable;
 }
 
 
 
 void
-gtk_image_view_set_zoom_gesture_enabled (GtkImageView *image_view,
-                                         gboolean      zoom_gesture_enabled)
+gtk_image_view_set_zoomable (GtkImageView *image_view,
+                             gboolean      zoomable)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
 
-  zoom_gesture_enabled = !!zoom_gesture_enabled;
+  zoomable = !!zoomable;
 
-  if (zoom_gesture_enabled != priv->zoom_gesture_enabled)
+  if (zoomable != priv->zoomable)
     {
-      priv->zoom_gesture_enabled = zoom_gesture_enabled;
+      priv->zoomable = zoomable;
       gtk_image_view_ensure_gestures (image_view);
       g_object_notify_by_pspec (G_OBJECT (image_view),
-                                widget_props[PROP_ZOOM_GESTURE_ENABLED]);
+                                widget_props[PROP_ZOOMABLE]);
     }
 }
 
 gboolean
-gtk_image_view_get_zoom_gesture_enabled (GtkImageView *image_view)
+gtk_image_view_get_zoomable (GtkImageView *image_view)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
   g_return_val_if_fail (GTK_IS_IMAGE_VIEW (image_view), FALSE);
 
-  return priv->zoom_gesture_enabled;
+  return priv->zoomable;
 }
 
 
@@ -1554,10 +1547,6 @@ gtk_image_view_get_transitions_enabled (GtkImageView *image_view)
 
   return priv->transitions_enabled;
 }
-/* }}} */
-
-
-/* GtkWidget API {{{ */
 
 static void
 gtk_image_view_realize (GtkWidget *widget)
@@ -1732,7 +1721,8 @@ gtk_image_view_scroll_event (GtkWidget       *widget,
   double new_scale = priv->scale - (0.1 * event->delta_y);
   State state;
 
-  if (!priv->image_surface)
+  if (!priv->image_surface ||
+      !priv->zoomable)
     return GDK_EVENT_PROPAGATE;
 
   if (event->state & GDK_SHIFT_MASK ||
@@ -1755,10 +1745,6 @@ gtk_image_view_scroll_event (GtkWidget       *widget,
   return GDK_EVENT_STOP;
 }
 
-/* }}} */
-
-
-/* GObject API {{{ */
 static void
 gtk_image_view_set_property (GObject      *object,
                              guint         prop_id,
@@ -1782,11 +1768,11 @@ gtk_image_view_set_property (GObject      *object,
       case PROP_FIT_ALLOCATION:
         gtk_image_view_set_fit_allocation (image_view, g_value_get_boolean (value));
         break;
-      case PROP_ROTATE_GESTURE_ENABLED:
-        gtk_image_view_set_rotate_gesture_enabled (image_view, g_value_get_boolean (value));
+      case PROP_ROTATABLE:
+        gtk_image_view_set_rotatable (image_view, g_value_get_boolean (value));
         break;
-      case PROP_ZOOM_GESTURE_ENABLED:
-        gtk_image_view_set_zoom_gesture_enabled (image_view, g_value_get_boolean (value));
+      case PROP_ZOOMABLE:
+        gtk_image_view_set_zoomable (image_view, g_value_get_boolean (value));
         break;
       case PROP_HADJUSTMENT:
         gtk_image_view_set_hadjustment (image_view, g_value_get_object (value));
@@ -1831,11 +1817,11 @@ gtk_image_view_get_property (GObject    *object,
       case PROP_FIT_ALLOCATION:
         g_value_set_boolean (value, priv->fit_allocation);
         break;
-      case PROP_ROTATE_GESTURE_ENABLED:
-        g_value_set_boolean (value, priv->rotate_gesture_enabled);
+      case PROP_ROTATABLE:
+        g_value_set_boolean (value, priv->rotatable);
         break;
-      case PROP_ZOOM_GESTURE_ENABLED:
-        g_value_set_boolean (value, priv->zoom_gesture_enabled);
+      case PROP_ZOOMABLE:
+        g_value_set_boolean (value, priv->zoomable);
         break;
       case PROP_HADJUSTMENT:
         g_value_set_object (value, priv->hadjustment);
@@ -1875,8 +1861,6 @@ gtk_image_view_finalize (GObject *object)
 
   G_OBJECT_CLASS (gtk_image_view_parent_class)->finalize (object);
 }
-
-/* }}} GObject API */
 
 static void
 gtk_image_view_class_init (GtkImageViewClass *view_class)
@@ -1941,28 +1925,28 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
                                                   0.0,
                                                   GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
   /**
-   * GtkImageView:rotate-gesture-enabled:
+   * GtkImageView:rotatable:
    * Whether or not the image can be rotated using a two-finger rotate gesture.
    *
    * Since: 3.20
    */
-  widget_props[PROP_ROTATE_GESTURE_ENABLED] = g_param_spec_boolean ("rotate-gesture-enabled",
-                                                                    P_("Foo"),
-                                                                    P_("fooar"),
-                                                                    TRUE,
-                                                                    GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
-  /**
-   * GtkImageView:zoom-gesture-enabled:
+  widget_props[PROP_ROTATABLE] = g_param_spec_boolean ("rotatable",
+                                                       P_("Foo"),
+                                                       P_("fooar"),
+                                                       TRUE,
+                                                       GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
+/**
+   * GtkImageView:zoomable:
    * Whether or not image can be scaled using a two-finger zoom gesture or not.
    *
    * Since: 3.20
    */
-  widget_props[PROP_ZOOM_GESTURE_ENABLED] = g_param_spec_boolean ("zoom-gesture-enabled",
-                                                                  P_("Foo"),
-                                                                  P_("fooar"),
-                                                                  TRUE,
-                                                                  GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
-  /**
+  widget_props[PROP_ZOOMABLE] = g_param_spec_boolean ("zoomable",
+                                                      P_("Foo"),
+                                                      P_("fooar"),
+                                                      TRUE,
+                                                      GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
+/**
    * GtkImageView:snap-angle:
    * Whether or not the angle property snaps to 90° steps. If this is enabled
    * and the angle property gets set to a non-90° step, the new value will be

@@ -178,7 +178,7 @@
         <child>
           <object class="GtkLabel">
             <property name="visible">true</property>
-            <property name="label">Zoom Gesture Enabled</property>
+            <property name="label">Zoomable</property>
             <property name="halign">start</property>
           </object>
           <packing>
@@ -202,7 +202,7 @@
         <child>
           <object class="GtkLabel">
             <property name="visible">true</property>
-            <property name="label">Rotate Gesture Enabled</property>
+            <property name="label">Rotatable</property>
             <property name="halign">start</property>
           </object>
           <packing>
