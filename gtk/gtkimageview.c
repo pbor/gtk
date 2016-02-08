@@ -2056,26 +2056,21 @@ gtk_image_view_update_surface (GtkImageView    *image_view,
   int real_width   = (new_width * scale_factor)  / widget_scale;
   int real_height  = (new_height * scale_factor) / widget_scale;
 
-  if (!priv->image_surface ||
-      cairo_image_surface_get_width (priv->image_surface)  != real_width ||
-      cairo_image_surface_get_height (priv->image_surface) != real_height ||
-      priv->scale_factor != scale_factor)
-    {
-      GdkWindow *window = gtk_widget_get_window (GTK_WIDGET (image_view));
-      cairo_surface_t *new_surface = gdk_cairo_surface_create_from_pixbuf (frame,
-                                                                           scale_factor,
-                                                                           window);
-      g_assert (new_surface != NULL);
-      gtk_image_view_replace_surface (image_view,
-                                      new_surface,
-                                      scale_factor);
-      gtk_widget_queue_resize (GTK_WIDGET (image_view));
-    }
+  new_surface = gdk_cairo_surface_create_from_pixbuf (frame,
+                                                      scale_factor,
+                                                      window);
+
+  gtk_image_view_replace_surface (image_view,
+                                  new_surface,
+                                  scale_factor);
+
+  /* TODO: Strictly speaking, we don't need to queue a resize if the
+   * surface size doesn't change. */
+
+  if (!priv->fit_allocation)
+    gtk_widget_queue_resize (GTK_WIDGET (image_view));
   else
-    {
-      gdk_cairo_surface_paint_pixbuf (priv->image_surface, frame);
-      gtk_widget_queue_draw (GTK_WIDGET (image_view));
-    }
+    gtk_widget_queue_draw (GTK_WIDGET (image_view));
 
   g_assert (priv->image_surface != NULL);
 }
