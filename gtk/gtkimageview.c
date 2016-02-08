@@ -1,3 +1,47 @@
+/*  Copyright 2016 Timm Bäder
+ *
+ * GTK+ is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or (at your option) any later version.
+ *
+ * GLib is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GTK+; see the file COPYING.  If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+ * SECTION:gtkimageview
+ * @Short_description: A widget for displaying content images to users.
+ * @Title: GtkImageView
+ *
+ * #GtkImageView is a widget intended to be used to display "content images"
+ * to users. What we refer to as "content images" in the documentation could
+ * be characterized as "images the user is deeply interested in". You should
+ * use #GtkImageView whenever you want to actually present an image instead
+ * of just using an icon.
+ *
+ * Contrary to #GtkImage, #GtkImageView does not just display an image with
+ * a fixed size, but provides ways of rotating and scaling it, as well as
+ * built-in gestures (via #GtkGestureRotate and #GtkGestureZoom) to rotate
+ * and zoom the image.
+ *
+ *
+ * ## Scale factor handling
+ *
+ * All the functions intended to set the image of a #GtkImageView instance take a
+ * "scale_factor" parameter (except for gtk_image_view_set_surface(), in which case
+ * the scale factor of the surface is taken instead). This scale factor can be interpreted
+ * the same as the #GtkWidget:scale-factor property of #GtkWidget, but for the given image.
+ *
+ * Since: 3.20
+ */
+
 #include "config.h"
 #include "gtkimageview.h"
 #include "gtktypebuiltins.h"
@@ -29,6 +73,9 @@
  *
  *   - Angle transition from 395 to 5 does a -390deg rotation
  *   - transition from !fit-allocation to fit-allocation and back
+ *   - We have lots of load functions taking a scale_factor param,
+ *     can we just explain that once and link to the section from there?
+ *   - Setting fit-allocation to FALSE sets the scale to 1.0. Is that right?
  *
  */
 
@@ -49,17 +96,17 @@ struct _GtkImageViewPrivate
   double   angle;
   int      scale_factor;
 
-  gboolean fit_allocation         : 1;
-  gboolean scale_set              : 1;
-  gboolean snap_angle             : 1;
-  gboolean rotatable : 1;
-  gboolean zoomable   : 1;
-  gboolean in_rotate              : 1;
-  gboolean in_zoom                : 1;
-  gboolean size_valid             : 1;
-  gboolean transitions_enabled    : 1;
-  gboolean in_angle_transition    : 1;
-  gboolean in_scale_transition    : 1;
+  gboolean fit_allocation      : 1;
+  gboolean scale_set           : 1;
+  gboolean snap_angle          : 1;
+  gboolean rotatable           : 1;
+  gboolean zoomable            : 1;
+  gboolean in_rotate           : 1;
+  gboolean in_zoom             : 1;
+  gboolean size_valid          : 1;
+  gboolean transitions_enabled : 1;
+  gboolean in_angle_transition : 1;
+  gboolean in_scale_transition : 1;
 
   GtkGesture *rotate_gesture;
   double      gesture_start_angle;
@@ -138,7 +185,6 @@ struct _LoadTaskData
 };
 
 
-/* Prototypes {{{ */
 static void gtk_image_view_update_surface (GtkImageView    *image_view,
                                            const GdkPixbuf *frame,
                                            int              scale_factor);
@@ -159,8 +205,6 @@ static void gtk_image_view_fix_anchor (GtkImageView *image_view,
                                        double        anchor_x,
                                        double        anchor_y,
                                        State        *old_state);
-
-/* }}} */
 
 
 static inline double
@@ -909,8 +953,6 @@ gtk_image_view_ensure_gestures (GtkImageView *image_view)
   if (priv->rotatable && priv->rotate_gesture == NULL)
     {
       priv->rotate_gesture = gtk_gesture_rotate_new (GTK_WIDGET (image_view));
-      /*gtk_event_controller_set_propagation_phase (GTK_EVENT_CONTROLLER (priv->rotate_gesture),*/
-                                                  /*GTK_PHASE_CAPTURE);*/
       g_signal_connect (priv->rotate_gesture, "angle-changed", (GCallback)gesture_rotate_changed_cb, image_view);
       g_signal_connect (priv->rotate_gesture, "begin", (GCallback)gesture_rotate_begin_cb, image_view);
       g_signal_connect (priv->rotate_gesture, "end", (GCallback)gesture_rotate_end_cb, image_view);
@@ -1217,11 +1259,17 @@ gtk_image_view_set_vscroll_policy (GtkImageView        *image_view,
  * @scale: The new scale value
  *
  * Sets the value of the #scale property. This will cause the
- * #scale-set property to be set to #TRUE as well
+ * #scale-set property to be set to #FALSE as well
  *
- * If #fit-allocation is #TRUE, it will be set to #FALSE, and @image_view
+ * If #GtkImageView:fit-allocation is %TRUE, it will be set to %FALSE, and @image_view
  * will be resized to the image's current size, taking the new scale into
  * account.
+ *
+ * If #GtkImageView:transitions-enabled is set to %TRUE, the internal scale value will be
+ * interpolated between the old and the new scale, gtk_image_view_get_scale()
+ * will report the one passed to gtk_image_view_set_scale() however.
+ *
+ * Since: 3.20
  */
 void
 gtk_image_view_set_scale (GtkImageView *image_view,
@@ -1279,6 +1327,14 @@ gtk_image_view_set_scale (GtkImageView *image_view,
   gtk_widget_queue_resize (GTK_WIDGET (image_view));
 }
 
+/**
+ * gtk_image_view_get_scale:
+ * @image_view: A #GtkImageView instance
+ *
+ * Returns: The current scale applied to the image.
+ *
+ * Since: 3.20
+ */
 double
 gtk_image_view_get_scale (GtkImageView *image_view)
 {
@@ -1290,12 +1346,14 @@ gtk_image_view_get_scale (GtkImageView *image_view)
 
 /**
  * gtk_image_view_set_angle:
- * @image_view: A #GtkImageView
+ * @image_view: A #GtkImageView instance
  * @angle: The angle to rotate the image about, in
  *   degrees. If this is < 0 or > 360, the value will
  *   be wrapped. So e.g. setting this to 362 will result in a
  *   angle of 2, setting it to -2 will result in 358.
  *   Both 0 and 360 are possible.
+ *
+ * Since: 3.20
  */
 void
 gtk_image_view_set_angle (GtkImageView *image_view,
@@ -1348,6 +1406,14 @@ gtk_image_view_set_angle (GtkImageView *image_view,
     gtk_widget_queue_resize (GTK_WIDGET (image_view));
 }
 
+/**
+ * gtk_image_view_get_angle:
+ * @image_view: A #GtkImageView instance
+ *
+ * Returns: The current angle value.
+ *
+ * Since: 3.20
+ */
 double
 gtk_image_view_get_angle (GtkImageView *image_view)
 {
@@ -1357,17 +1423,17 @@ gtk_image_view_get_angle (GtkImageView *image_view)
   return priv->angle;
 }
 
-
-
 /**
  * gtk_image_view_set_snap_angle:
  * @image_view: A #GtkImageView instance
  * @snap_angle: The new value of the #snap-angle property
  *
- * Setting #snap-angle to #TRUE will cause @image_view's  angle to
- * be snapped to 90° steps. Setting the #angle property will cause it to
+ * Setting #snap-angle to %TRUE will cause @image_view's  angle to
+ * be snapped to 90° steps. Setting the #GtkImageView:angle property will cause it to
  * be set to the closest 90° step, so e.g. using an angle of 40 will result
- * in an angle of 0, using using 240 will result in 270, etc.
+ * in an angle of 0, using 240 will result in 270, etc.
+ *
+ * Since: 3.20
  */
 void
 gtk_image_view_set_snap_angle (GtkImageView *image_view,
@@ -1394,6 +1460,14 @@ gtk_image_view_set_snap_angle (GtkImageView *image_view,
     }
 }
 
+/**
+ * gtk_image_view_get_snap_angle:
+ * @image_view: A #GtkImageView instance
+ *
+ * Returns: The current value of the #GtkImageView:snap-angle property.
+ *
+ * Since: 3.20
+ */
 gboolean
 gtk_image_view_get_snap_angle (GtkImageView *image_view)
 {
@@ -1410,15 +1484,17 @@ gtk_image_view_get_snap_angle (GtkImageView *image_view)
  * @image_view: A #GtkImageView instance
  * @fit_allocation: The new value of the #fit-allocation property.
  *
- * Setting #fit-allocation to #TRUE will cause the image to be scaled
+ * Setting #GtkImageView:fit-allocation to %TRUE will cause the image to be scaled
  * to the widget's allocation, unless it would cause the image to be
  * scaled up.
  *
- * Setting #fit-allocation will have the side effect of setting
- * #scale-set set to #FALSE, thus giving the #GtkImageView the control
- * over the image's scale. Additionally, if the new #fit-allocation
- * value is #FALSE, the scale will be reset to 1.0 and the #GtkImageView
+ * Setting #GtkImageView:fit-allocation will have the side effect of setting
+ * #scale-set set to %FALSE, thus giving the #GtkImageView the control
+ * over the image's scale. Additionally, if the new #GtkImageView:fit-allocation
+ * value is %FALSE, the scale will be reset to 1.0 and the #GtkImageView
  * will be resized to take at least the image's real size.
+ *
+ * Since: 3.20
  */
 void
 gtk_image_view_set_fit_allocation (GtkImageView *image_view,
@@ -1453,6 +1529,14 @@ gtk_image_view_set_fit_allocation (GtkImageView *image_view,
   gtk_widget_queue_resize (GTK_WIDGET (image_view));
 }
 
+/**
+ * gtk_image_view_get_fit_allocation:
+ * @image_view: A #GtkImageView instance
+ *
+ * Returns: The current value of the #GtkImageView:fit-allocation property.
+ *
+ * Since: 3.20
+ */
 gboolean
 gtk_image_view_get_fit_allocation (GtkImageView *image_view)
 {
@@ -1462,8 +1546,16 @@ gtk_image_view_get_fit_allocation (GtkImageView *image_view)
   return priv->fit_allocation;
 }
 
-
-
+/**
+ * gtk_image_view_set_rotatable:
+ * @image_view: A #GtkImageView instance
+ * @rotatable: The new value of the rotatable property
+ *
+ * Sets the value of the #GtkImageView:rotatable property to @rotatable. This controls whether
+ * the user can change the angle of the displayed image using a two-finger gesture.
+ *
+ * Since: 3.20
+ */
 void
 gtk_image_view_set_rotatable (GtkImageView *image_view,
                               gboolean      rotatable)
@@ -1482,6 +1574,14 @@ gtk_image_view_set_rotatable (GtkImageView *image_view,
     }
 }
 
+/**
+ * gtk_image_view_get_rotatable:
+ * @image_view: A #GtkImageView instance
+ *
+ * Returns: The current value of the #GtkImageView:rotatable property
+ *
+ * Since: 3.20
+ */
 gboolean
 gtk_image_view_get_rotatable (GtkImageView *image_view)
 {
@@ -1491,8 +1591,16 @@ gtk_image_view_get_rotatable (GtkImageView *image_view)
   return priv->rotatable;
 }
 
-
-
+/**
+ * gtk_image_view_set_zoomable:
+ * @image_view: A #GtkImageView instance
+ * @zoomable: The new value of the #zoomable property
+ *
+ * Sets the new value of the #GtkImageView:zoomable property. This controls whether the user can
+ * change the #GtkImageView:scale property using a two-finger gesture.
+ *
+ * Since: 3.20
+ */
 void
 gtk_image_view_set_zoomable (GtkImageView *image_view,
                              gboolean      zoomable)
@@ -1511,6 +1619,14 @@ gtk_image_view_set_zoomable (GtkImageView *image_view,
     }
 }
 
+/**
+ * gtk_image_view_get_zoomable:
+ * @image_view: A #GtkImageView instance
+ *
+ * Returns: The current value of the #GtkImageView:zoomable property.
+ *
+ * Since: 3.20
+ */
 gboolean
 gtk_image_view_get_zoomable (GtkImageView *image_view)
 {
@@ -1520,8 +1636,15 @@ gtk_image_view_get_zoomable (GtkImageView *image_view)
   return priv->zoomable;
 }
 
-
-
+/**
+ * gtk_image_view_set_transitions_enabled:
+ * @image_view: A #GtkImageView instance
+ * @transitions_enabled: The new value of the #transitions-enabled property
+ *
+ * Sets the new value of the #GtkImageView:transitions-enabled property.
+ *
+ * Since: 3.20
+ */
 void
 gtk_image_view_set_transitions_enabled (GtkImageView *image_view,
                                         gboolean      transitions_enabled)
@@ -1539,6 +1662,14 @@ gtk_image_view_set_transitions_enabled (GtkImageView *image_view,
     }
 }
 
+/**
+ * gtk_image_view_get_transitions_enabled:
+ * @image_view: A #GtkImageView instance
+ *
+ * Returns the current value of the #GtkImageView:transitions-enabled property.
+ *
+ * Since: 3.20
+ */
 gboolean
 gtk_image_view_get_transitions_enabled (GtkImageView *image_view)
 {
@@ -1905,21 +2036,20 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
    * Since: 3.20
    */
   widget_props[PROP_SCALE_SET] = g_param_spec_boolean ("scale-set",
-                                                       P_(""),
-                                                       P_("fooar"),
+                                                       P_("Scale Set"),
+                                                       P_("Wheter the scale property has been set by the user or by GtkImageView itself"),
                                                        FALSE,
                                                        GTK_PARAM_READABLE|G_PARAM_EXPLICIT_NOTIFY);
   /**
    * GtkImageView:angle:
    * The angle the surface gets rotated about.
-   * This is in degrees and we rotate in the mathematically negative direction,
-   * i.e. clock wise.
+   * This is in degrees and we rotate clock-wise.
    *
    * Since: 3.20
    */
   widget_props[PROP_ANGLE] = g_param_spec_double ("angle",
-                                                  P_("angle"),
-                                                  P_("angle"),
+                                                  P_("Angle"),
+                                                  P_("The angle the internal surface gets rotated about"),
                                                   0.0,
                                                   360.0,
                                                   0.0,
@@ -1931,33 +2061,32 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
    * Since: 3.20
    */
   widget_props[PROP_ROTATABLE] = g_param_spec_boolean ("rotatable",
-                                                       P_("Foo"),
-                                                       P_("fooar"),
+                                                       P_("Rotatable"),
+                                                       P_("Controls user-rotatability"),
                                                        TRUE,
                                                        GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
 /**
    * GtkImageView:zoomable:
-   * Whether or not image can be scaled using a two-finger zoom gesture or not.
+   * Whether or not the image can be scaled using a two-finger zoom gesture.
    *
    * Since: 3.20
    */
   widget_props[PROP_ZOOMABLE] = g_param_spec_boolean ("zoomable",
-                                                      P_("Foo"),
-                                                      P_("fooar"),
+                                                      P_("Zoomable"),
+                                                      P_("Controls user-zoomability"),
                                                       TRUE,
                                                       GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
 /**
    * GtkImageView:snap-angle:
    * Whether or not the angle property snaps to 90° steps. If this is enabled
    * and the angle property gets set to a non-90° step, the new value will be
-   * set to the closest 90° step that is lower than the given angle.
-   * Changing the angle from one 90° step to another will be transitioned
+   * set to the closest 90° step
    *
    * Since: 3.20
    */
   widget_props[PROP_SNAP_ANGLE] = g_param_spec_boolean ("snap-angle",
-                                                        P_("Foo"),
-                                                        P_("fooar"),
+                                                        P_("Snap Angle"),
+                                                        P_("Snap angle to 90° steps"),
                                                         FALSE,
                                                         GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
 
@@ -1970,21 +2099,23 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
    * Since: 3.20
    */
   widget_props[PROP_FIT_ALLOCATION] = g_param_spec_boolean ("fit-allocation",
-                                                            P_("Foo"),
-                                                            P_("fooar"),
+                                                            P_("Fit Allocation"),
+                                                            P_("Scale the image down to fit into the widget allocation"),
                                                             FALSE,
                                                             GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
 
   /**
    *  GtkImageView:transitions-enabled
    *
-   *  Whether or not certain property changes will be interpolated.
+   *  Whether or not certain property changes will be interpolated. This affects a variety
+   *  of function calls on a #GtkImageView instance, e.g. setting the angle property, the
+   *  scale property, but also the angle snapping in case snap-angle is set.
    *
    *  Since: 3.20
    */
   widget_props[PROP_TRANSITIONS_ENABLED] = g_param_spec_boolean ("transitions-enabled",
-                                                                 P_("Foo"),
-                                                                 P_("fooar"),
+                                                                 P_("Transitions Enabled"),
+                                                                 P_("Wheter scale and angle changes get interpolated"),
                                                                  TRUE,
                                                                  GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY);
 
@@ -2000,6 +2131,13 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
   gtk_widget_class_set_css_name (widget_class, "imageview");
 }
 
+/**
+ * gtk_image_view_new:
+ *
+ * Returns: A newly created #GtkImageView instance.
+ *
+ * Since: 3.20
+ */
 GtkWidget *
 gtk_image_view_new ()
 {
@@ -2173,8 +2311,21 @@ gtk_image_view_load_from_input_stream (GTask        *task,
     g_task_return_error (task, error);
 }
 
-
-
+/**
+ * gtk_image_view_load_from_file_async:
+ * @image_view: A #GtkImageView instance
+ * @file: The file to read from
+ * @scale_factor: Scale factor of the image. Pass 0 to use the
+ *   scale factor of @image_view
+ * @cancellable: (nullable): A #GCancellable that can be used to
+ *   cancel the loading operation
+ * @callback: (scope async): Callback to call once the operation finished
+ * @user_data: (closure): Data to pass to @callback
+ *
+ * Asynchronously loads an image from the given file.
+ *
+ * Since: 3.20
+ */
 void
 gtk_image_view_load_from_file_async (GtkImageView        *image_view,
                                      GFile               *file,
@@ -2199,6 +2350,17 @@ gtk_image_view_load_from_file_async (GtkImageView        *image_view,
 
   g_object_unref (task);
 }
+
+/**
+ * gtk_image_view_load_from_file_finish:
+ * @image_view: A #GtkImageView instance
+ * @result: A #GAsyncResult
+ * @error: (nullable): Location to store error information in case the operation fails
+ *
+ * Returns: %TRUE if the operation succeeded, %FALSE otherwise.
+ *
+ * Since: 3.20
+ */
 gboolean
 gtk_image_view_load_from_file_finish   (GtkImageView  *image_view,
                                         GAsyncResult  *result,
@@ -2209,9 +2371,19 @@ gtk_image_view_load_from_file_finish   (GtkImageView  *image_view,
   return g_task_propagate_boolean (G_TASK (result), error);
 }
 
-
-
-
+/**
+ * gtk_image_view_load_from_stream_async:
+ * @image_view: A #GtkImageView instance
+ * @input_stream: (transfer full): Input stream to read from
+ * @scale_factor: The scale factor of the read image
+ * @cancellable: (nullable): The #GCancellable used to cancel the operation
+ * @callback: (scope async): A #GAsyncReadyCallback invoked when the operation finishes
+ * @user_data: (closure): The data to pass to @callback
+ *
+ * Asynchronously loads an image from the given input stream.
+ *
+ * Since: 3.20
+ */
 void
 gtk_image_view_load_from_stream_async (GtkImageView        *image_view,
                                        GInputStream        *input_stream,
@@ -2236,6 +2408,17 @@ gtk_image_view_load_from_stream_async (GtkImageView        *image_view,
 
   g_object_unref (task);
 }
+
+/**
+ * gtk_image_view_load_from_stream_finish:
+ * @image_view: A #GtkImageView instance
+ * @result: A #GAsyncResult
+ * @error: (nullable): Location to store error information on failure
+ *
+ * Returns: %TRUE if the operation finished successfully, %FALSE otherwise.
+ *
+ * Since: 3.20
+ */
 gboolean
 gtk_image_view_load_from_stream_finish (GtkImageView  *image_view,
                                         GAsyncResult  *result,
@@ -2246,7 +2429,7 @@ gtk_image_view_load_from_stream_finish (GtkImageView  *image_view,
   return g_task_propagate_boolean (G_TASK (result), error);
 }
 
-/*
+/**
  * gtk_image_view_set_pixbuf:
  * @image_view: A #GtkImageView instance
  * @pixbuf: (transfer none): A #GdkPixbuf instance
@@ -2255,6 +2438,8 @@ gtk_image_view_load_from_stream_finish (GtkImageView  *image_view,
  *   with the given scale factor", i.e. if the pixbuf's scale
  *   factor is 2, and the screen's scale factor is also 2, the
  *   pixbuf won't be scaled up.
+ *
+ * Since: 3.20
  */
 void
 gtk_image_view_set_pixbuf (GtkImageView    *image_view,
@@ -2283,9 +2468,11 @@ gtk_image_view_set_pixbuf (GtkImageView    *image_view,
 /**
  * gtk_image_view_set_surface:
  * @image_view: A #GtkImageView instance
- * @surface: (nullable) (transfer full): A #cairo_surface_t of type #CAIRO_SURFACE_TYPE_IMAGE, or
+ * @surface: (nullable) (transfer full): A #cairo_surface_t of type %CAIRO_SURFACE_TYPE_IMAGE, or
  *   %NULL to unset any internal image data. In case this is %NULL, the scale will
  *   be reset to 1.0.
+ *
+ * Since: 3.20
  */
 void
 gtk_image_view_set_surface (GtkImageView    *image_view,
@@ -2345,6 +2532,8 @@ gtk_image_view_set_surface (GtkImageView    *image_view,
  *   with the given scale factor", i.e. if the animation's scale
  *   factor is 2, and the screen's scale factor is also 2, the
  *   animation won't be scaled up.
+ *
+ * Since: 3.20
  */
 void
 gtk_image_view_set_animation (GtkImageView       *image_view,

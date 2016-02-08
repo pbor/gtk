@@ -19,9 +19,9 @@ G_BEGIN_DECLS
 #define GTK_IMAGE_VIEW_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), GTK_TYPE_IMAGE_VIEW, GtkImageViewClass))
 
 
-typedef struct _GtkImageView              GtkImageView;
-typedef struct _GtkImageViewPrivate       GtkImageViewPrivate;
-typedef struct _GtkImageViewClass         GtkImageViewClass;
+typedef struct _GtkImageView         GtkImageView;
+typedef struct _GtkImageViewPrivate  GtkImageViewPrivate;
+typedef struct _GtkImageViewClass    GtkImageViewClass;
 
 
 struct _GtkImageView
@@ -118,7 +118,7 @@ gboolean gtk_image_view_get_fit_allocation (GtkImageView *image_view);
 
 GDK_AVAILABLE_IN_3_20
 void gtk_image_view_set_rotatable (GtkImageView *image_view,
-                                   gboolean      rotate_gesture_enabled);
+                                   gboolean      rotatable);
 
 GDK_AVAILABLE_IN_3_20
 gboolean gtk_image_view_get_rotatable (GtkImageView *image_view);
@@ -127,7 +127,7 @@ gboolean gtk_image_view_get_rotatable (GtkImageView *image_view);
 
 GDK_AVAILABLE_IN_3_20
 void gtk_image_view_set_zoomable (GtkImageView *image_view,
-                                  gboolean      zoom_gesture_enabled);
+                                  gboolean      zoomable);
 
 GDK_AVAILABLE_IN_3_20
 gboolean gtk_image_view_get_zoomable (GtkImageView *image_view);

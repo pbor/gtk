@@ -1999,8 +1999,6 @@ GtkImageIconNameData
 GtkImageGIconData
 </SECTION>
 
-
-
 <SECTION>
 <FILE>gtkimageview</FILE>
 <TITLE>GtkImageView</TITLE>
@@ -2036,11 +2034,6 @@ GTK_IMAGE_VIEW_GET_CLASS
 GtkImageViewPrivate
 gtk_image_view_get_type
 </SECTION>
-
-
-
-
-
 
 <SECTION>
 <FILE>gtkimagemenuitem</FILE>
