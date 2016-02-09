@@ -1666,7 +1666,7 @@ gtk_image_view_set_transitions_enabled (GtkImageView *image_view,
  * gtk_image_view_get_transitions_enabled:
  * @image_view: A #GtkImageView instance
  *
- * Returns the current value of the #GtkImageView:transitions-enabled property.
+ * Returns: the current value of the #GtkImageView:transitions-enabled property.
  *
  * Since: 3.20
  */
@@ -1677,6 +1677,23 @@ gtk_image_view_get_transitions_enabled (GtkImageView *image_view)
   g_return_val_if_fail (GTK_IS_IMAGE_VIEW (image_view), FALSE);
 
   return priv->transitions_enabled;
+}
+
+/**
+ * gtk_image_view_get_scale_set:
+ * @image_view: A #GtkImageView instance
+ *
+ * Returns: the current value of the #GtkImageView:scale-set property.
+ *
+ * Since: 3.20
+ */
+gboolean
+gtk_image_view_get_scale_set (GtkImageView *image_view)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+  g_return_val_if_fail (GTK_IS_IMAGE_VIEW (image_view), FALSE);
+
+  return priv->scale_set;
 }
 
 static void

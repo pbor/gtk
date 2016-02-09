@@ -132,6 +132,9 @@ void gtk_image_view_set_zoomable (GtkImageView *image_view,
 GDK_AVAILABLE_IN_3_20
 gboolean gtk_image_view_get_zoomable (GtkImageView *image_view);
 
+GDK_AVAILABLE_IN_3_20
+gboolean gtk_image_view_get_scale_set (GtkImageView *image_view);
+
 G_END_DECLS
 
 #endif
