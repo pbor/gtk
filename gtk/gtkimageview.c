@@ -302,6 +302,9 @@ scale_frameclock_cb (GtkWidget     *widget,
   priv->visible_scale = priv->transition_start_scale + new_scale;
   priv->size_valid = FALSE;
 
+  if (t >= 0)
+    priv->in_scale_transition = FALSE;
+
   if (priv->hadjustment && priv->vadjustment)
     {
       GtkAllocation allocation;
@@ -321,10 +324,7 @@ scale_frameclock_cb (GtkWidget     *widget,
     gtk_widget_queue_resize (widget);
 
   if (t >= 1.0)
-    {
-      priv->in_scale_transition = FALSE;
-      return G_SOURCE_REMOVE;
-    }
+    return G_SOURCE_REMOVE;
 
   return G_SOURCE_CONTINUE;
 }
@@ -364,6 +364,8 @@ angle_frameclock_cb (GtkWidget     *widget,
   priv->visible_angle = priv->transition_start_angle + new_angle;
   priv->size_valid = FALSE;
 
+  if (t >= 1.0)
+    priv->in_angle_transition = FALSE;
 
   if (priv->hadjustment && priv->vadjustment)
     {
@@ -383,10 +385,7 @@ angle_frameclock_cb (GtkWidget     *widget,
     gtk_widget_queue_resize (widget);
 
   if (t >= 1.0)
-    {
-      priv->in_angle_transition = FALSE;
-      return G_SOURCE_REMOVE;
-    }
+    return G_SOURCE_REMOVE;
 
   return G_SOURCE_CONTINUE;
 }
