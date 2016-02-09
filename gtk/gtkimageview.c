@@ -1922,6 +1922,9 @@ gtk_image_view_set_property (GObject      *object,
       case PROP_ZOOMABLE:
         gtk_image_view_set_zoomable (image_view, g_value_get_boolean (value));
         break;
+      case PROP_TRANSITIONS_ENABLED:
+        gtk_image_view_set_transitions_enabled (image_view, g_value_get_boolean (value));
+        break;
       case PROP_HADJUSTMENT:
         gtk_image_view_set_hadjustment (image_view, g_value_get_object (value));
         break;
@@ -1970,6 +1973,9 @@ gtk_image_view_get_property (GObject    *object,
         break;
       case PROP_ZOOMABLE:
         g_value_set_boolean (value, priv->zoomable);
+        break;
+      case PROP_TRANSITIONS_ENABLED:
+        g_value_set_boolean (value, priv->transitions_enabled);
         break;
       case PROP_HADJUSTMENT:
         g_value_set_object (value, priv->hadjustment);

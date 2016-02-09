@@ -218,6 +218,7 @@ do_image_view (GtkWidget *do_widget)
   GtkWidget *fit_allocation_switch = GTK_WIDGET (gtk_builder_get_object (builder, "fit_allocation_switch"));
   GtkWidget *rotate_gesture_switch = GTK_WIDGET (gtk_builder_get_object (builder, "rotate_gesture_switch"));
   GtkWidget *zoom_gesture_switch = GTK_WIDGET (gtk_builder_get_object (builder, "zoom_gesture_switch"));
+  GtkWidget *transitions_switch = GTK_WIDGET (gtk_builder_get_object (builder, "transitions_switch"));
 
   GtkAdjustment *scale_adjustment = GTK_ADJUSTMENT (gtk_builder_get_object (builder, "scale_adjustment"));
   GtkAdjustment *angle_adjustment = GTK_ADJUSTMENT (gtk_builder_get_object (builder, "angle_adjustment"));
@@ -225,15 +226,13 @@ do_image_view (GtkWidget *do_widget)
           uri_entry   = GTK_WIDGET (gtk_builder_get_object (builder, "uri_entry"));
 
 
-  /*gtk_window_set_title (GTK_WINDOW (window), "blue: current, green: anchor");*/
-
   g_object_bind_property (scale_adjustment, "value", image_view, "scale",
                           G_BINDING_BIDIRECTIONAL);
 
   g_object_bind_property (angle_adjustment, "value", image_view, "angle",
-                          /*G_BINDING_BIDIRECTIONAL | */G_BINDING_SYNC_CREATE);
+                          G_BINDING_SYNC_CREATE);
   g_object_bind_property (image_view, "angle", angle_adjustment, "value",
-                          /*G_BINDING_BIDIRECTIONAL | */G_BINDING_SYNC_CREATE);
+                          G_BINDING_SYNC_CREATE);
 
 
 
@@ -249,6 +248,11 @@ do_image_view (GtkWidget *do_widget)
   g_object_bind_property (image_view, "zoomable",
                           zoom_gesture_switch, "active",
                           G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
+
+  g_object_bind_property (image_view, "transitions-enabled",
+                          transitions_switch, "active",
+                          G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
+
 
 
 
