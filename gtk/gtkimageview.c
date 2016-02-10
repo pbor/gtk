@@ -302,7 +302,7 @@ scale_frameclock_cb (GtkWidget     *widget,
   priv->visible_scale = priv->transition_start_scale + new_scale;
   priv->size_valid = FALSE;
 
-  if (t >= 0)
+  if (t >= 1.0)
     priv->in_scale_transition = FALSE;
 
   if (priv->hadjustment && priv->vadjustment)
