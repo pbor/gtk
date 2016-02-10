@@ -330,8 +330,7 @@ scale_frameclock_cb (GtkWidget     *widget,
 }
 
 static void
-gtk_image_view_animate_to_scale (GtkImageView *image_view,
-                                 double        new_scale)
+gtk_image_view_animate_to_scale (GtkImageView *image_view)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
@@ -392,8 +391,7 @@ angle_frameclock_cb (GtkWidget     *widget,
 
 
 static void
-gtk_image_view_animate_to_angle (GtkImageView *image_view,
-                                 double        target_angle)
+gtk_image_view_animate_to_angle (GtkImageView *image_view)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
@@ -418,7 +416,7 @@ gtk_image_view_do_snapping (GtkImageView *image_view)
   g_assert (priv->snap_angle);
 
   if (gtk_image_view_transitions_enabled (image_view))
-    gtk_image_view_animate_to_angle (image_view, new_angle);
+    gtk_image_view_animate_to_angle (image_view);
 
   priv->angle = new_angle;
 
@@ -1286,7 +1284,7 @@ gtk_image_view_set_scale (GtkImageView *image_view,
   gtk_image_view_get_current_state (image_view, &state);
 
   if (gtk_image_view_transitions_enabled (image_view))
-    gtk_image_view_animate_to_scale (image_view, scale);
+    gtk_image_view_animate_to_scale (image_view);
 
   priv->scale = scale;
   g_object_notify_by_pspec (G_OBJECT (image_view),
@@ -1370,7 +1368,7 @@ gtk_image_view_set_angle (GtkImageView *image_view,
 
   if (gtk_image_view_transitions_enabled (image_view) &&
       ABS(gtk_image_view_clamp_angle (angle) - priv->angle) > ANGLE_TRANSITION_MIN_DELTA)
-      gtk_image_view_animate_to_angle (image_view, angle);
+      gtk_image_view_animate_to_angle (image_view);
 
   angle = gtk_image_view_clamp_angle (angle);
 
