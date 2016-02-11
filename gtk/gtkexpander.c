@@ -518,7 +518,9 @@ gtk_expander_set_property (GObject      *object,
       gtk_expander_set_use_markup (expander, g_value_get_boolean (value));
       break;
     case PROP_SPACING:
+      G_GNUC_BEGIN_IGNORE_DEPRECATIONS;
       gtk_expander_set_spacing (expander, g_value_get_int (value));
+      G_GNUC_END_IGNORE_DEPRECATIONS;
       break;
     case PROP_LABEL_WIDGET:
       gtk_expander_set_label_widget (expander, g_value_get_object (value));

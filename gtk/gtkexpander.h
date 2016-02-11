@@ -88,10 +88,10 @@ GDK_AVAILABLE_IN_ALL
 gboolean              gtk_expander_get_expanded        (GtkExpander *expander);
 
 /* Spacing between the expander/label and the child */
-GDK_AVAILABLE_IN_ALL
+GDK_DEPRECATED_IN_3_20
 void                  gtk_expander_set_spacing         (GtkExpander *expander,
                                                         gint         spacing);
-GDK_AVAILABLE_IN_ALL
+GDK_DEPRECATED_IN_3_20
 gint                  gtk_expander_get_spacing         (GtkExpander *expander);
 
 GDK_AVAILABLE_IN_ALL
