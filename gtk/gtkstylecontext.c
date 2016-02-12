@@ -2677,7 +2677,7 @@ gtk_style_context_get_padding (GtkStyleContext *context,
  * @margin: (out): return value for the margin settings
  *
  * Gets the margin for a given state as a #GtkBorder.
- * See gtk_style_property_get() and #GTK_STYLE_PROPERTY_MARGIN
+ * See gtk_style_context_get() and #GTK_STYLE_PROPERTY_MARGIN
  * for details.
  *
  * Since: 3.0
