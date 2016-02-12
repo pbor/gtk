@@ -2024,6 +2024,8 @@ gtk_image_view_get_rotatable
 gtk_image_view_set_zoomable
 gtk_image_view_get_zoomable
 gtk_image_view_get_scale_set
+gtk_image_view_set_transitions_enabled
+gtk_image_view_get_transitions_enabled
 <SUBSECTION Standard>
 GTK_IMAGE_VIEW
 GTK_IS_IMAGE_VIEW
