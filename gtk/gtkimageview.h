@@ -1,3 +1,20 @@
+/*  Copyright 2016 Timm Bäder
+ *
+ * GTK+ is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or (at your option) any later version.
+ *
+ * GLib is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GTK+; see the file COPYING.  If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
 #ifndef __GTK_IMAGE_VIEW_H__
 #define __GTK_IMAGE_VIEW_H__
 
@@ -87,16 +104,12 @@ void   gtk_image_view_set_scale (GtkImageView *image_view,
 GDK_AVAILABLE_IN_3_20
 double gtk_image_view_get_scale (GtkImageView *image_view);
 
-
-
 GDK_AVAILABLE_IN_3_20
 void  gtk_image_view_set_angle (GtkImageView *image_view,
                                 double        angle);
 
 GDK_AVAILABLE_IN_3_20
 double gtk_image_view_get_angle (GtkImageView *image_view);
-
-
 
 GDK_AVAILABLE_IN_3_20
 void gtk_image_view_set_snap_angle (GtkImageView *image_view,
@@ -105,8 +118,6 @@ void gtk_image_view_set_snap_angle (GtkImageView *image_view,
 GDK_AVAILABLE_IN_3_20
 gboolean gtk_image_view_get_snap_angle (GtkImageView *image_view);
 
-
-
 GDK_AVAILABLE_IN_3_20
 void gtk_image_view_set_fit_allocation (GtkImageView *image_view,
                                         gboolean      fit_allocation);
@@ -114,16 +125,12 @@ void gtk_image_view_set_fit_allocation (GtkImageView *image_view,
 GDK_AVAILABLE_IN_3_20
 gboolean gtk_image_view_get_fit_allocation (GtkImageView *image_view);
 
-
-
 GDK_AVAILABLE_IN_3_20
 void gtk_image_view_set_rotatable (GtkImageView *image_view,
                                    gboolean      rotatable);
 
 GDK_AVAILABLE_IN_3_20
 gboolean gtk_image_view_get_rotatable (GtkImageView *image_view);
-
-
 
 GDK_AVAILABLE_IN_3_20
 void gtk_image_view_set_zoomable (GtkImageView *image_view,
@@ -134,6 +141,13 @@ gboolean gtk_image_view_get_zoomable (GtkImageView *image_view);
 
 GDK_AVAILABLE_IN_3_20
 gboolean gtk_image_view_get_scale_set (GtkImageView *image_view);
+
+GDK_AVAILABLE_IN_3_20
+void gtk_image_view_set_transitions_enabled (GtkImageView *image_view,
+                                             gboolean      transitions_enabled);
+
+GDK_AVAILABLE_IN_3_20
+gboolean gtk_image_view_get_transitions_enabled (GtkImageView *image_view);
 
 G_END_DECLS
 
