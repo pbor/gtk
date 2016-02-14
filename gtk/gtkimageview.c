@@ -57,8 +57,8 @@
 #define DEG_TO_RAD(x) (((x) / 360.0) * (2 * M_PI))
 #define RAD_TO_DEG(x) (((x) / (2.0 * M_PI) * 360.0))
 
-#define TRANSITION_DURATION (150.0 * 1000.0)
-/*#define TRANSITION_DURATION (1500.0 * 1000.0)*/
+/*#define TRANSITION_DURATION (150.0 * 1000.0)*/
+#define TRANSITION_DURATION (4500.0 * 1000.0)
 #define ANGLE_TRANSITION_MIN_DELTA (1.0)
 #define SCALE_TRANSITION_MIN_DELTA (0.01)
 
@@ -232,7 +232,7 @@ gtk_image_view_clamp_angle (double angle)
   if (angle > 360.0)
     new_angle -= (int)(angle / 360.0) * 360;
   else if (angle < 0.0)
-    new_angle = 360.0 + (int)(angle / 360.0);
+    new_angle += 360 - ((int)(angle  /360) * 360.0);
 
   g_assert (new_angle >= 0.0);
   g_assert (new_angle <= 360.0);
@@ -343,11 +343,18 @@ angle_frameclock_cb (GtkWidget     *widget,
 {
   GtkImageView *image_view = GTK_IMAGE_VIEW (widget);
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
-  State state;
+  int direction = GPOINTER_TO_INT (user_data);
   gint64 now = gdk_frame_clock_get_frame_time (frame_clock);
+  State state;
+  double target_angle = priv->angle;
+
+  if (direction == 1 && target_angle < priv->transition_start_angle)
+    target_angle += 360.0;
+  else if (direction == 0 && target_angle > priv->transition_start_angle)
+    target_angle -= 360.0;
 
   double t = (now - priv->angle_transition_start) / TRANSITION_DURATION;
-  double new_angle = (priv->angle - priv->transition_start_angle) * t;
+  double new_angle = (target_angle - priv->transition_start_angle) * t;
 
   gtk_image_view_get_current_state (image_view, &state);
 
@@ -381,7 +388,8 @@ angle_frameclock_cb (GtkWidget     *widget,
 }
 
 static void
-gtk_image_view_animate_to_angle (GtkImageView *image_view)
+gtk_image_view_animate_to_angle (GtkImageView *image_view,
+                                 int           direction)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
@@ -393,7 +401,8 @@ gtk_image_view_animate_to_angle (GtkImageView *image_view)
 
   gtk_widget_add_tick_callback (GTK_WIDGET (image_view),
                                 angle_frameclock_cb,
-                                NULL, NULL);
+                                GINT_TO_POINTER (direction),
+                                NULL);
 }
 
 static void
@@ -405,7 +414,7 @@ gtk_image_view_do_snapping (GtkImageView *image_view)
   g_assert (priv->snap_angle);
 
   if (gtk_image_view_transitions_enabled (image_view))
-    gtk_image_view_animate_to_angle (image_view);
+    gtk_image_view_animate_to_angle (image_view, new_angle > priv->angle);
 
   priv->angle = new_angle;
 
@@ -1334,11 +1343,11 @@ gtk_image_view_set_angle (GtkImageView *image_view,
 
   gtk_image_view_get_current_state (image_view, &state);
 
-  g_message ("Passed angle: %f", angle);
-
   if (gtk_image_view_transitions_enabled (image_view) &&
       ABS(gtk_image_view_clamp_angle (angle) - priv->angle) > ANGLE_TRANSITION_MIN_DELTA)
-      gtk_image_view_animate_to_angle (image_view);
+    {
+      gtk_image_view_animate_to_angle (image_view, angle > priv->angle);
+    }
 
   angle = gtk_image_view_clamp_angle (angle);
 
@@ -2082,7 +2091,7 @@ gtk_image_view_class_init (GtkImageViewClass *view_class)
    * GtkImageView:fit-allocation:
    * If this is %TRUE, the scale the image will be drawn in will depend on the current
    * widget allocation. The image will be scaled down to fit into the widget allocation,
-   * but never scaled up.
+   * but never scaled up. The aspect ratio of the image will be kept at all times.
    *
    * Since: 3.20
    */
