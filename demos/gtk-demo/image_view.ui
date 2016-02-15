@@ -82,8 +82,7 @@
 
         <child>
           <object class="GtkButton">
-            <property name="visible">false</property>
-            <property name="no_show_all">true</property>
+            <property name="visible">true</property>
             <property name="label" translatable="yes">Load HiDPI Pixbuf</property>
             <signal name="clicked" handler="load_hidpi_pixbuf_button_clicked_cb" object="image_view"/>
           </object>

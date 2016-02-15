@@ -596,8 +596,10 @@ gtk_image_view_compute_bounding_box (GtkImageView *image_view,
   gtk_widget_get_allocation (GTK_WIDGET (image_view), &alloc);
   angle = gtk_image_view_get_real_angle (image_view);
 
-  image_width  = cairo_image_surface_get_width (priv->image_surface);
-  image_height = cairo_image_surface_get_height (priv->image_surface);
+  image_width  = cairo_image_surface_get_width (priv->image_surface)  / priv->scale_factor;
+  image_height = cairo_image_surface_get_height (priv->image_surface) / priv->scale_factor;
+
+  g_message ("image size: %f/%f", image_width, image_height);
 
   upper_right_degrees = DEG_TO_RAD (angle) + atan (image_height / image_width);
   upper_left_degrees  = DEG_TO_RAD (angle) + atan (image_height / -image_width);
@@ -1051,8 +1053,8 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
   GtkStyleContext *sc = gtk_widget_get_style_context (widget);
   int widget_width = gtk_widget_get_allocated_width (widget);
   int widget_height = gtk_widget_get_allocated_height (widget);
-  int draw_x;
-  int draw_y;
+  double draw_x = 0;
+  double draw_y = 0;
   int image_width;
   int image_height;
   double draw_width;
@@ -1090,45 +1092,45 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
 
   if (priv->hadjustment && priv->vadjustment)
     {
-      draw_x = (gtk_adjustment_get_page_size (priv->hadjustment) - image_width)  / 2;
-      draw_y = (gtk_adjustment_get_page_size (priv->vadjustment) - image_height) / 2;
+      draw_x = (gtk_adjustment_get_page_size (priv->hadjustment) - image_width / priv->scale_factor)  / 2.0;
+      draw_y = (gtk_adjustment_get_page_size (priv->vadjustment) - image_height / priv->scale_factor) / 2.0;
     }
   else
     {
-      draw_x = (widget_width  - image_width)  / 2;
-      draw_y = (widget_height - image_height) / 2;
+      draw_x = (widget_width  - image_width / priv->scale_factor)  / 2.0;
+      draw_y = (widget_height - image_height / priv->scale_factor) / 2.0;
     }
 
   cairo_rectangle (ct, 0, 0, widget_width, widget_height);
 
   if (priv->hadjustment && draw_width >= widget_width)
     {
-      draw_x = (draw_width - image_width) / 2;
+      draw_x = (draw_width - image_width / priv->scale_factor) / 2.0;
       draw_x -= gtk_adjustment_get_value (priv->hadjustment);
     }
 
   if (priv->vadjustment && draw_height >= widget_height)
     {
-      draw_y = (draw_height - image_height) / 2;
+      draw_y = (draw_height - image_height / priv->scale_factor) / 2.0;
       draw_y -= gtk_adjustment_get_value (priv->vadjustment);
     }
 
   /* Rotate around the center */
   cairo_translate (ct,
-                   draw_x + (image_width  / 2.0),
-                   draw_y + (image_height / 2.0));
+                   draw_x + (image_width / priv->scale_factor / 2.0),
+                   draw_y + (image_height / priv->scale_factor/ 2.0));
   cairo_rotate (ct, DEG_TO_RAD (gtk_image_view_get_real_angle (image_view)));
   cairo_translate (ct,
-                   - draw_x - (image_width  / 2.0),
-                   - draw_y - (image_height / 2.0));
+                   - draw_x - (image_width / priv->scale_factor / 2.0),
+                   - draw_y - (image_height / priv->scale_factor / 2.0));
 
-  cairo_scale (ct, scale * priv->scale_factor, scale * priv->scale_factor);
+  cairo_scale (ct, scale , scale );
   cairo_set_source_surface (ct,
                             priv->image_surface,
-                            draw_x / scale / priv->scale_factor,
-                            draw_y / scale / priv->scale_factor);
-  cairo_fill (ct);
+                            draw_x / scale ,
+                            draw_y / scale);
   cairo_pattern_set_filter (cairo_get_source (ct), CAIRO_FILTER_FAST);
+  cairo_fill (ct);
 
   return GDK_EVENT_PROPAGATE;
 }
@@ -2199,7 +2201,8 @@ gtk_image_view_update_surface (GtkImageView    *image_view,
       size_changed = (cairo_image_surface_get_width (priv->image_surface) !=
                       cairo_image_surface_get_width (new_surface)) ||
                      (cairo_image_surface_get_height (priv->image_surface) !=
-                      cairo_image_surface_get_height (new_surface));
+                      cairo_image_surface_get_height (new_surface)) ||
+                     (scale_factor != priv->scale_factor);
     }
 
   gtk_image_view_replace_surface (image_view,
@@ -2261,7 +2264,7 @@ gtk_image_view_load_image_from_stream (GtkImageView *image_view,
   GdkPixbufAnimation *result;
 
   g_assert (error == NULL);
-  result = gdk_pixbuf_animation_new_from_stream (G_INPUT_STREAM (input_stream),
+  result = gdk_pixbuf_animation_new_from_stream (input_stream,
                                                  cancellable,
                                                  &error);
 
@@ -2392,7 +2395,8 @@ gtk_image_view_load_from_file_finish   (GtkImageView  *image_view,
  * gtk_image_view_load_from_stream_async:
  * @image_view: A #GtkImageView instance
  * @input_stream: (transfer full): Input stream to read from
- * @scale_factor: The scale factor of the read image
+ * @scale_factor: The scale factor of the image. Pass 0 to use the scale factor
+ *   of @image_view.
  * @cancellable: (nullable): The #GCancellable used to cancel the operation
  * @callback: (scope async): A #GAsyncReadyCallback invoked when the operation finishes
  * @user_data: (closure): The data to pass to @callback
@@ -2452,11 +2456,8 @@ gtk_image_view_load_from_stream_finish (GtkImageView  *image_view,
  * gtk_image_view_set_pixbuf:
  * @image_view: A #GtkImageView instance
  * @pixbuf: (transfer none): A #GdkPixbuf instance
- * @scale_factor: The scale factor of the pixbuf. This will
- *   be interpreted as "the given pixbuf is supposed to be used
- *   with the given scale factor", i.e. if the pixbuf's scale
- *   factor is 2, and the screen's scale factor is also 2, the
- *   pixbuf won't be scaled up.
+ * @scale_factor: The scale factor of the pixbuf. Pass 0 to use the scale factor
+ *   of @image_view
  *
  * Sets the internal image to @pixbuf. @image_view will not take ownership of @pixbuf,
  * so it will not unref or free it in any way. If you want to unset the internal
@@ -2485,6 +2486,8 @@ gtk_image_view_set_pixbuf (GtkImageView    *image_view,
   gtk_image_view_update_surface (image_view, pixbuf, scale_factor);
 
   gtk_image_view_update_adjustments (image_view);
+
+  /* gtk_image_view_update_surface already calls queue_draw/queue_resize */
 }
 
 /**
@@ -2540,11 +2543,8 @@ gtk_image_view_set_surface (GtkImageView    *image_view,
  * gtk_image_view_set_animation:
  * @image_view: A #GtkImageView instance
  * @animation: (transfer full): The #GdkPixbufAnimation to use
- * @scale_factor: The scale factor of the animation. This will
- *   be interpreted as "the given animation is supposed to be used
- *   with the given scale factor", i.e. if the animation's scale
- *   factor is 2, and the screen's scale factor is also 2, the
- *   animation won't be scaled up.
+ * @scale_factor: The scale factor of the animation. Pass 0 to use
+ *   the scale factor of @image_view
  *
  * Takes the given #GdkPixbufAnimation and sets the internal image to that
  * animation. This will also automatically start the animation. If you want

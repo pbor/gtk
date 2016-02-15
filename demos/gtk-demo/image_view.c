@@ -173,7 +173,7 @@ load_hidpi_pixbuf_button_clicked_cb ()
   GdkPixbuf *pixbuf;
 
   /* I really hope you have this. */
-  pixbuf = gdk_pixbuf_new_from_file ("/usr/share/backgrounds/gnome/adwaita-day.jpg",
+  pixbuf = gdk_pixbuf_new_from_file ("/usr/share/backgrounds/gnome/Fabric.jpg",
                                      NULL);
 
   g_assert (pixbuf != NULL);
@@ -189,7 +189,7 @@ load_surface_button_clicked_cb ()
   cairo_surface_t *surface;
 
   /* I really hope you have this. */
-  pixbuf = gdk_pixbuf_new_from_file ("/usr/share/backgrounds/gnome/adwaita-day.jpg",
+  pixbuf = gdk_pixbuf_new_from_file ("/usr/share/backgrounds/gnome/Fabric.jpg",
                                      NULL);
 
   g_assert (pixbuf != NULL);
