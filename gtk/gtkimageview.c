@@ -57,20 +57,16 @@
 #define DEG_TO_RAD(x) (((x) / 360.0) * (2 * M_PI))
 #define RAD_TO_DEG(x) (((x) / (2.0 * M_PI) * 360.0))
 
-/*#define TRANSITION_DURATION (150.0 * 1000.0)*/
-#define TRANSITION_DURATION (4500.0 * 1000.0)
+#define TRANSITION_DURATION (150.0 * 1000.0)
+/*#define TRANSITION_DURATION (4500.0 * 1000.0)*/
 #define ANGLE_TRANSITION_MIN_DELTA (1.0)
 #define SCALE_TRANSITION_MIN_DELTA (0.01)
 
 
 /*
  *  TODO:
- *   - Angle transition from 395 to 5 does a -390deg rotation
- *   - transition from !fit-allocation to fit-allocation and back
  *   - We have lots of load functions taking a scale_factor param,
  *     can we just explain that once and link to the section from there?
- *   - Setting fit-allocation to FALSE sets the scale to 1.0. Is that right?
- *   - What if I set_angle while a transition is still ongoing?
  */
 
 
@@ -133,9 +129,11 @@ struct _GtkImageViewPrivate
   /* Transitions */
   double transition_start_angle;
   gint64 angle_transition_start;
+  guint  angle_transition_id;
 
   double transition_start_scale;
   gint64 scale_transition_start;
+  guint  scale_transition_id;
 
   /* We cache the bounding box size so we don't have to
    * recompute it at every draw() */
@@ -315,7 +313,10 @@ scale_frameclock_cb (GtkWidget     *widget,
     gtk_widget_queue_resize (widget);
 
   if (t >= 1.0)
-    return G_SOURCE_REMOVE;
+    {
+      priv->scale_transition_id = 0;
+      return G_SOURCE_REMOVE;
+    }
 
   return G_SOURCE_CONTINUE;
 }
@@ -325,15 +326,18 @@ gtk_image_view_animate_to_scale (GtkImageView *image_view)
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
+  if (priv->scale_transition_id != 0)
+    gtk_widget_remove_tick_callback (GTK_WIDGET (image_view), priv->scale_transition_id);
+
   /* Target scale is priv->scale */
   priv->in_scale_transition = TRUE;
   priv->visible_scale = priv->scale;
   priv->transition_start_scale = priv->scale;
   priv->scale_transition_start = gdk_frame_clock_get_frame_time (gtk_widget_get_frame_clock (GTK_WIDGET (image_view)));
 
-  gtk_widget_add_tick_callback (GTK_WIDGET (image_view),
-                                scale_frameclock_cb,
-                                NULL, NULL);
+  priv->scale_transition_id = gtk_widget_add_tick_callback (GTK_WIDGET (image_view),
+                                                            scale_frameclock_cb,
+                                                            NULL, NULL);
 }
 
 static gboolean
@@ -382,7 +386,10 @@ angle_frameclock_cb (GtkWidget     *widget,
     gtk_widget_queue_resize (widget);
 
   if (t >= 1.0)
-    return G_SOURCE_REMOVE;
+    {
+      priv->angle_transition_id = 0;
+      return G_SOURCE_REMOVE;
+    }
 
   return G_SOURCE_CONTINUE;
 }
@@ -393,16 +400,22 @@ gtk_image_view_animate_to_angle (GtkImageView *image_view,
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
+  if (priv->angle_transition_id != 0)
+    {
+      gtk_widget_remove_tick_callback (GTK_WIDGET (image_view), priv->angle_transition_id);
+      priv->angle_transition_id = 0;
+    }
+
   /* Target angle is priv->angle */
   priv->in_angle_transition = TRUE;
   priv->visible_angle = priv->angle;
   priv->transition_start_angle = priv->angle;
   priv->angle_transition_start = gdk_frame_clock_get_frame_time (gtk_widget_get_frame_clock (GTK_WIDGET (image_view)));
 
-  gtk_widget_add_tick_callback (GTK_WIDGET (image_view),
-                                angle_frameclock_cb,
-                                GINT_TO_POINTER (direction),
-                                NULL);
+  priv->angle_transition_id = gtk_widget_add_tick_callback (GTK_WIDGET (image_view),
+                                                            angle_frameclock_cb,
+                                                            GINT_TO_POINTER (direction),
+                                                            NULL);
 }
 
 static void
@@ -971,6 +984,8 @@ gtk_image_view_init (GtkImageView *image_view)
   priv->rotatable = TRUE;
   priv->zoomable = TRUE;
   priv->transitions_enabled = TRUE;
+  priv->angle_transition_id = 0;
+  priv->scale_transition_id = 0;
 
   gtk_image_view_ensure_gestures (image_view);
 }
@@ -1112,8 +1127,8 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
                             priv->image_surface,
                             draw_x / scale / priv->scale_factor,
                             draw_y / scale / priv->scale_factor);
-  cairo_pattern_set_filter (cairo_get_source (ct), CAIRO_FILTER_FAST);
   cairo_fill (ct);
+  cairo_pattern_set_filter (cairo_get_source (ct), CAIRO_FILTER_FAST);
 
   return GDK_EVENT_PROPAGATE;
 }
