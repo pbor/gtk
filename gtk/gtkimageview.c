@@ -599,8 +599,6 @@ gtk_image_view_compute_bounding_box (GtkImageView *image_view,
   image_width  = cairo_image_surface_get_width (priv->image_surface)  / priv->scale_factor;
   image_height = cairo_image_surface_get_height (priv->image_surface) / priv->scale_factor;
 
-  g_message ("image size: %f/%f", image_width, image_height);
-
   upper_right_degrees = DEG_TO_RAD (angle) + atan (image_height / image_width);
   upper_left_degrees  = DEG_TO_RAD (angle) + atan (image_height / -image_width);
   r = sqrt ((image_width / 2.0) * (image_width / 2.0) + (image_height / 2.0) * (image_height / 2.0));
@@ -1087,42 +1085,42 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
   if (draw_width == 0 || draw_height == 0)
     return GDK_EVENT_PROPAGATE;
 
-  image_width  = cairo_image_surface_get_width (priv->image_surface)  * scale;
-  image_height = cairo_image_surface_get_height (priv->image_surface) * scale;
+  image_width  = cairo_image_surface_get_width (priv->image_surface)  * scale / priv->scale_factor;
+  image_height = cairo_image_surface_get_height (priv->image_surface) * scale / priv->scale_factor;
 
   if (priv->hadjustment && priv->vadjustment)
     {
-      draw_x = (gtk_adjustment_get_page_size (priv->hadjustment) - image_width / priv->scale_factor)  / 2.0;
-      draw_y = (gtk_adjustment_get_page_size (priv->vadjustment) - image_height / priv->scale_factor) / 2.0;
+      draw_x = (gtk_adjustment_get_page_size (priv->hadjustment) - image_width)  / 2.0;
+      draw_y = (gtk_adjustment_get_page_size (priv->vadjustment) - image_height) / 2.0;
     }
   else
     {
-      draw_x = (widget_width  - image_width / priv->scale_factor)  / 2.0;
-      draw_y = (widget_height - image_height / priv->scale_factor) / 2.0;
+      draw_x = (widget_width  - image_width)  / 2.0;
+      draw_y = (widget_height - image_height) / 2.0;
     }
 
   cairo_rectangle (ct, 0, 0, widget_width, widget_height);
 
   if (priv->hadjustment && draw_width >= widget_width)
     {
-      draw_x = (draw_width - image_width / priv->scale_factor) / 2.0;
+      draw_x = (draw_width - image_width) / 2.0;
       draw_x -= gtk_adjustment_get_value (priv->hadjustment);
     }
 
   if (priv->vadjustment && draw_height >= widget_height)
     {
-      draw_y = (draw_height - image_height / priv->scale_factor) / 2.0;
+      draw_y = (draw_height - image_height) / 2.0;
       draw_y -= gtk_adjustment_get_value (priv->vadjustment);
     }
 
   /* Rotate around the center */
   cairo_translate (ct,
-                   draw_x + (image_width / priv->scale_factor / 2.0),
-                   draw_y + (image_height / priv->scale_factor/ 2.0));
+                   draw_x + (image_width  / 2.0),
+                   draw_y + (image_height / 2.0));
   cairo_rotate (ct, DEG_TO_RAD (gtk_image_view_get_real_angle (image_view)));
   cairo_translate (ct,
-                   - draw_x - (image_width / priv->scale_factor / 2.0),
-                   - draw_y - (image_height / priv->scale_factor / 2.0));
+                   - draw_x - (image_width  / 2.0),
+                   - draw_y - (image_height / 2.0));
 
   cairo_scale (ct, scale , scale );
   cairo_set_source_surface (ct,
