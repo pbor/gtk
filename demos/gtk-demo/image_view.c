@@ -154,16 +154,22 @@ scale_scale_format_value_cb (GtkScale *scale,
 void
 load_pixbuf_button_clicked_cb ()
 {
-  GdkPixbuf *pixbuf;
 
-  /* I really hope you have this. */
-  pixbuf = gdk_pixbuf_new_from_file ("/usr/share/backgrounds/gnome/Fabric.jpg",
-                                     NULL);
 
-  g_assert (pixbuf != NULL);
-  gtk_image_view_set_pixbuf (GTK_IMAGE_VIEW (image_view), pixbuf, 0);
+  GtkPixbufImage *image = gtk_pixbuf_image_new ("/usr/share/backgrounds/gnome/Fabric.jpg", 1);
 
-  g_object_unref (G_OBJECT (pixbuf));
+  gtk_image_view_set_abstract_image (GTK_IMAGE_VIEW (image_view),
+                                     GTK_ABSTRACT_IMAGE (image));
+
+  /*GdkPixbuf *pixbuf;*/
+
+  /*pixbuf = gdk_pixbuf_new_from_file ("/usr/share/backgrounds/gnome/Fabric.jpg",*/
+                                     /*NULL);*/
+
+  /*g_assert (pixbuf != NULL);*/
+  /*gtk_image_view_set_pixbuf (GTK_IMAGE_VIEW (image_view), pixbuf, 0);*/
+
+  /*g_object_unref (G_OBJECT (pixbuf));*/
 }
 
 

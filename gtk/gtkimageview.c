@@ -123,8 +123,12 @@ struct _GtkImageViewPrivate
   gboolean                is_animation;
   GdkPixbufAnimation     *source_animation;
   GdkPixbufAnimationIter *source_animation_iter;
-  cairo_surface_t        *image_surface;
+  /*cairo_surface_t        *image_surface;*/
   int                     animation_timeout;
+
+
+  GtkAbstractImage *image;
+
 
   /* Transitions */
   double transition_start_angle;
@@ -271,7 +275,8 @@ gtk_image_view_transitions_enabled (GtkImageView *image_view)
                 "gtk-enable-animations", &animations_enabled,
                 NULL);
 
-  return priv->transitions_enabled && animations_enabled && priv->image_surface;
+  /*return priv->transitions_enabled && animations_enabled && priv->image_surface;*/
+  return priv->transitions_enabled && animations_enabled && priv->image;
 }
 
 static gboolean
@@ -577,6 +582,7 @@ gtk_image_view_compute_bounding_box (GtkImageView *image_view,
   double scale;
   double angle;
 
+#if 0
   if (priv->size_valid)
     {
       *width = priv->cached_width;
@@ -586,7 +592,10 @@ gtk_image_view_compute_bounding_box (GtkImageView *image_view,
       return;
     }
 
-  if (!priv->image_surface)
+#endif
+
+  /*if (!priv->image_surface)*/
+  if (!priv->image)
     {
       *width  = 0;
       *height = 0;
@@ -596,8 +605,10 @@ gtk_image_view_compute_bounding_box (GtkImageView *image_view,
   gtk_widget_get_allocation (GTK_WIDGET (image_view), &alloc);
   angle = gtk_image_view_get_real_angle (image_view);
 
-  image_width  = cairo_image_surface_get_width (priv->image_surface)  / priv->scale_factor;
-  image_height = cairo_image_surface_get_height (priv->image_surface) / priv->scale_factor;
+  image_width = gtk_abstract_image_get_width (priv->image) /
+                gtk_abstract_image_get_scale_factor (priv->image);
+  image_height = gtk_abstract_image_get_height (priv->image) /
+                 gtk_abstract_image_get_scale_factor (priv->image);
 
   upper_right_degrees = DEG_TO_RAD (angle) + atan (image_height / image_width);
   upper_left_degrees  = DEG_TO_RAD (angle) + atan (image_height / -image_width);
@@ -669,7 +680,8 @@ gtk_image_view_update_adjustments (GtkImageView *image_view)
   if (!priv->hadjustment && !priv->vadjustment)
     return;
 
-  if (!priv->image_surface)
+  /*if (!priv->image_surface)*/
+  if (!priv->image)
     {
       if (priv->hadjustment)
         gtk_adjustment_configure (priv->hadjustment, 0, 0, 1, 0, 0, 1);
@@ -741,7 +753,8 @@ gesture_zoom_begin_cb (GtkGesture       *gesture,
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (user_data);
 
   if (!priv->zoomable ||
-      !priv->image_surface)
+      !priv->image)
+      /*!priv->image_surface)*/
     {
       gtk_gesture_set_state (gesture, GTK_EVENT_SEQUENCE_DENIED);
       return;
@@ -834,7 +847,8 @@ gesture_rotate_begin_cb (GtkGesture       *gesture,
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (user_data);
 
   if (!priv->rotatable ||
-      !priv->image_surface)
+      /*!priv->image_surface)*/
+      !priv->image)
     {
       gtk_gesture_set_state (gesture, GTK_EVENT_SEQUENCE_DENIED);
       return;
@@ -1075,7 +1089,7 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
       gtk_render_frame      (sc, ct, 0, 0, widget_width, widget_height);
     }
 
-  if (!priv->image_surface)
+  if (!priv->image)
     return GDK_EVENT_PROPAGATE;
 
   gtk_image_view_compute_bounding_box (image_view,
@@ -1085,8 +1099,10 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
   if (draw_width == 0 || draw_height == 0)
     return GDK_EVENT_PROPAGATE;
 
-  image_width  = cairo_image_surface_get_width (priv->image_surface)  * scale / priv->scale_factor;
-  image_height = cairo_image_surface_get_height (priv->image_surface) * scale / priv->scale_factor;
+  image_width = gtk_abstract_image_get_width (priv->image) * scale /
+                gtk_abstract_image_get_scale_factor (priv->image);
+  image_height = gtk_abstract_image_get_height (priv->image) * scale /
+                 gtk_abstract_image_get_scale_factor (priv->image);
 
   if (priv->hadjustment && priv->vadjustment)
     {
@@ -1123,12 +1139,9 @@ gtk_image_view_draw (GtkWidget *widget, cairo_t *ct)
                    - draw_y - (image_height / 2.0));
 
   cairo_scale (ct, scale , scale );
-  cairo_set_source_surface (ct,
-                            priv->image_surface,
-                            draw_x / scale ,
-                            draw_y / scale);
-  cairo_pattern_set_filter (cairo_get_source (ct), CAIRO_FILTER_FAST);
-  cairo_fill (ct);
+  cairo_translate (ct, draw_x / scale, draw_y / scale);
+  gtk_abstract_image_draw (priv->image, ct);
+  cairo_paint (ct);
 
   return GDK_EVENT_PROPAGATE;
 }
@@ -1293,7 +1306,8 @@ gtk_image_view_set_scale (GtkImageView *image_view,
   priv->size_valid = FALSE;
   gtk_image_view_update_adjustments (image_view);
 
-  if (!priv->image_surface)
+  /*if (!priv->image_surface)*/
+  if (!priv->image)
     return;
 
   if (priv->hadjustment != NULL && priv->vadjustment != NULL)
@@ -1378,7 +1392,8 @@ gtk_image_view_set_angle (GtkImageView *image_view,
   g_object_notify_by_pspec (G_OBJECT (image_view),
                             widget_props[PROP_ANGLE]);
 
-  if (!priv->image_surface)
+  /*if (!priv->image_surface)*/
+  if (!priv->image)
     return;
 
   if (priv->hadjustment && priv->vadjustment && !priv->fit_allocation)
@@ -1858,7 +1873,8 @@ gtk_image_view_scroll_event (GtkWidget       *widget,
   double new_scale = priv->scale - (0.1 * event->delta_y);
   State state;
 
-  if (!priv->image_surface ||
+  /*if (!priv->image_surface ||*/
+  if (!priv->image ||
       !priv->zoomable)
     return GDK_EVENT_PROPAGATE;
 
@@ -1997,8 +2013,8 @@ gtk_image_view_finalize (GObject *object)
   g_clear_object (&priv->hadjustment);
   g_clear_object (&priv->vadjustment);
 
-  if (priv->image_surface)
-    cairo_surface_destroy (priv->image_surface);
+  /*if (priv->image_surface)*/
+    /*cairo_surface_destroy (priv->image_surface);*/
 
   G_OBJECT_CLASS (gtk_image_view_parent_class)->finalize (object);
 }
@@ -2165,19 +2181,19 @@ gtk_image_view_replace_surface (GtkImageView    *image_view,
 {
   GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
 
-  if (priv->image_surface)
-    cairo_surface_destroy (priv->image_surface);
+  /*if (priv->image_surface)*/
+    /*cairo_surface_destroy (priv->image_surface);*/
 
   if (scale_factor == 0)
     priv->scale_factor = gtk_widget_get_scale_factor (GTK_WIDGET (image_view));
   else
     priv->scale_factor = scale_factor;
 
-  priv->image_surface = surface;
+  /*priv->image_surface = surface;*/
   priv->size_valid = FALSE;
 
-  if (surface)
-    cairo_surface_reference (priv->image_surface);
+  /*if (surface)*/
+    /*cairo_surface_reference (priv->image_surface);*/
 }
 
 static void
@@ -2194,14 +2210,14 @@ gtk_image_view_update_surface (GtkImageView    *image_view,
                                                       scale_factor,
                                                       window);
 
-  if (priv->image_surface)
-    {
-      size_changed = (cairo_image_surface_get_width (priv->image_surface) !=
-                      cairo_image_surface_get_width (new_surface)) ||
-                     (cairo_image_surface_get_height (priv->image_surface) !=
-                      cairo_image_surface_get_height (new_surface)) ||
-                     (scale_factor != priv->scale_factor);
-    }
+  /*if (priv->image_surface)*/
+    /*{*/
+      /*size_changed = (cairo_image_surface_get_width (priv->image_surface) !=*/
+                      /*cairo_image_surface_get_width (new_surface)) ||*/
+                     /*(cairo_image_surface_get_height (priv->image_surface) !=*/
+                      /*cairo_image_surface_get_height (new_surface)) ||*/
+                     /*(scale_factor != priv->scale_factor);*/
+    /*}*/
 
   gtk_image_view_replace_surface (image_view,
                                   new_surface,
@@ -2212,7 +2228,7 @@ gtk_image_view_update_surface (GtkImageView    *image_view,
   else
     gtk_widget_queue_resize (GTK_WIDGET (image_view));
 
-  g_assert (priv->image_surface != NULL);
+  /*g_assert (priv->image_surface != NULL);*/
 }
 
 static void
@@ -2224,7 +2240,7 @@ gtk_image_view_replace_animation (GtkImageView       *image_view,
 
   if (priv->source_animation)
     {
-      g_assert (priv->image_surface);
+      /*g_assert (priv->image_surface);*/
       if (priv->is_animation)
         gtk_image_view_stop_animation (image_view);
     }
@@ -2560,4 +2576,18 @@ gtk_image_view_set_animation (GtkImageView       *image_view,
   g_return_if_fail (scale_factor >= 0);
 
   gtk_image_view_replace_animation (image_view, animation, scale_factor);
+}
+
+void
+gtk_image_view_set_abstract_image (GtkImageView     *image_view,
+                                   GtkAbstractImage *abstract_image)
+{
+  GtkImageViewPrivate *priv = gtk_image_view_get_instance_private (image_view);
+
+  g_return_if_fail (GTK_IS_IMAGE_VIEW (image_view));
+  g_return_if_fail (GTK_IS_ABSTRACT_IMAGE (abstract_image));
+
+  priv->image = abstract_image;
+
+  gtk_widget_queue_resize (GTK_WIDGET (image_view));
 }

@@ -23,6 +23,7 @@
 #endif
 
 #include <gtk/gtkwidget.h>
+#include "gtkabstractimage.h"
 
 
 G_BEGIN_DECLS
@@ -148,6 +149,9 @@ void gtk_image_view_set_transitions_enabled (GtkImageView *image_view,
 
 GDK_AVAILABLE_IN_3_20
 gboolean gtk_image_view_get_transitions_enabled (GtkImageView *image_view);
+
+GDK_AVAILABLE_IN_3_20
+void gtk_image_view_set_abstract_image (GtkImageView *image_view, GtkAbstractImage *abstract_image);
 
 G_END_DECLS
 
